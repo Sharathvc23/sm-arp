@@ -1,0 +1,38 @@
+{
+  "id": "14-requires-review",
+  "description": "High-value purchase flagged requires_review=true with screen-reader priority.",
+  "spec_ref": "spec.md §9",
+  "expected_outcome": "verify_pass",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T18:15:00Z",
+    "action": {
+      "category": "purchase",
+      "human_summary": "Purchased a $1,250 plane ticket: Boston → Tokyo, June 12 outbound.",
+      "outcome": "completed",
+      "amount": {
+        "currency": "USD",
+        "cents": -125000
+      },
+      "counterparty_label": "JAL Airlines",
+      "counterparty_did": "did:key:z6MkkjfwJUSqmSB49ZaMWLuwPtmn9X4ZnZ4B6yPnfDE5cXKp"
+    },
+    "accessibility": {
+      "summary_language": "en-US",
+      "complexity_level": "complex",
+      "requires_review": true,
+      "screen_reader_hints": {
+        "priority": "notable"
+      }
+    },
+    "signature": "q+gp4T3NU5lIUc0u4n9kx3+92wMF9m/nMHKCiXoCT7kG9Px0cL+MF43aNkYgWe1YBg3JKNNHZUbLWJdWfzJ1Dw=="
+  }
+}

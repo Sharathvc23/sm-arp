@@ -1,0 +1,55 @@
+{
+  "id": "04-data-shared-gdpr",
+  "description": "data_shared with GDPR applicable_regimes, data_residency, multilingual.",
+  "spec_ref": "spec.md §4.3, §8, §9",
+  "expected_outcome": "verify_pass",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "44444444-4444-4444-8444-444444444444",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T15:15:00Z",
+    "action": {
+      "category": "data_shared",
+      "human_summary": "Shared your address and dietary preferences with The Bakery Co for catering.",
+      "outcome": "completed",
+      "counterparty_label": "The Bakery Co",
+      "machine_payload": {
+        "fields_shared": [
+          "postal_address",
+          "dietary_preferences"
+        ],
+        "purpose": "catering_order_fulfillment"
+      }
+    },
+    "jurisdiction": {
+      "principal_residence": "DE-BY",
+      "action_locus": "DE-BY",
+      "data_residency": [
+        "DE",
+        "IE"
+      ],
+      "applicable_regimes": [
+        "gdpr"
+      ],
+      "consent_evidence_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "accessibility": {
+      "summary_language": "en-US",
+      "alt_summaries": [
+        {
+          "lang": "de-DE",
+          "summary": "Ihre Adresse und Ernährungspräferenzen wurden für das Catering an The Bakery Co weitergegeben."
+        }
+      ],
+      "complexity_level": "moderate",
+      "requires_review": true
+    },
+    "signature": "i8cRgfGFY8MzHP9uxJ2qzlPQBwqlB9/2LP344m5MGPnbirR595AZOJpTbXDUlycGBWTu1QG1wwIq2bJXym86BQ=="
+  }
+}

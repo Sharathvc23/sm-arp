@@ -1,0 +1,32 @@
+{
+  "id": "07-decision-made",
+  "description": "decision_made with explicit choice + rationale in machine_payload.",
+  "spec_ref": "spec.md §4.3",
+  "expected_outcome": "verify_pass",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "77777777-7777-4777-8777-777777777777",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T16:00:00Z",
+    "action": {
+      "category": "decision_made",
+      "human_summary": "Declined the Boston conference invitation in favor of the family commitment.",
+      "outcome": "completed",
+      "machine_payload": {
+        "options": [
+          "accept_boston_conf",
+          "decline_boston_conf"
+        ],
+        "choice": "decline_boston_conf",
+        "rationale": "calendar_conflict"
+      }
+    },
+    "signature": "HNzk0nNtKQCvbCk+abnOlEDFkkOj7y6HNT/mIEyo3NOUjRiXrF4e8wkZ0BnZgm8Ji2YxCV/UYQQH6fGx97IuAw=="
+  }
+}
