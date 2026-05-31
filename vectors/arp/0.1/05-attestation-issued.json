@@ -1,0 +1,31 @@
+{
+  "id": "05-attestation-issued",
+  "description": "attestation_issued category — trust-graph operation.",
+  "spec_ref": "spec.md §4.3",
+  "expected_outcome": "verify_pass",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "55555555-5555-4555-8555-555555555555",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T15:30:00Z",
+    "action": {
+      "category": "attestation_issued",
+      "human_summary": "Issued an attestation that Tess Devereux is an active member of the Boston chapter.",
+      "outcome": "completed",
+      "counterparty_did": "did:key:z6MkkjfwJUSqmSB49ZaMWLuwPtmn9X4ZnZ4B6yPnfDE5cXKp",
+      "counterparty_label": "Tess Devereux",
+      "machine_payload": {
+        "attestation_type": "chapter_membership",
+        "attested_chapter": "boston-chapter",
+        "validity_window_days": 365
+      }
+    },
+    "signature": "9eitItoQMH3jD7vYyaNidNQZf+GEv40dZS178upIRISeM2PTMbIl92D6gejOhw/H7IA8nzVwRR3dhNkZZgK+Aw=="
+  }
+}

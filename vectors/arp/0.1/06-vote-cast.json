@@ -1,0 +1,33 @@
+{
+  "id": "06-vote-cast",
+  "description": "vote_cast in a chapter governance poll.",
+  "spec_ref": "spec.md §4.3",
+  "expected_outcome": "verify_pass",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "66666666-6666-4666-8666-666666666666",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T15:45:00Z",
+    "action": {
+      "category": "vote_cast",
+      "human_summary": "Voted YES on the proposal to extend the federation peering window to 12 minutes.",
+      "outcome": "completed",
+      "machine_payload": {
+        "proposal_id": "PROP-2026-014",
+        "choice": "yes",
+        "tally_chapter": "bayarea-nanda-chapter"
+      }
+    },
+    "jurisdiction": {
+      "principal_residence": "US-CA",
+      "action_locus": "US-CA"
+    },
+    "signature": "Q6RU5AsT4nPxol+qxstuG5Vo0BkWoyHeIFDHpLJC1CABIIX8GfA9hqxecVKqe4bqvG588WIzun2OO4Kd/08ZAA=="
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "id": "01-basic-purchase",
+  "description": "Simple purchase, required fields plus counterparty + amount. Strict pass.",
+  "spec_ref": "spec.md §3, §4.3",
+  "expected_outcome": "verify_pass",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "11111111-1111-4111-8111-111111111111",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T14:23:01Z",
+    "action": {
+      "category": "purchase",
+      "human_summary": "Bought 2 tickets to The Substance at AMC Boston Common 19, $34.50.",
+      "outcome": "completed",
+      "counterparty_did": "did:key:z6MkkjfwJUSqmSB49ZaMWLuwPtmn9X4ZnZ4B6yPnfDE5cXKp",
+      "counterparty_label": "AMC Boston Common 19",
+      "amount": {
+        "currency": "USD",
+        "cents": -3450
+      }
+    },
+    "signature": "pUcvz2taaSFjzH32e5xo7SnnNnNE2tNfCvKMSM7MNyon2x8gdNh932e/FpgVUiJ34zf/4Uaf2vm4yJughN2yAA=="
+  }
+}

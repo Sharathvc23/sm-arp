@@ -1,0 +1,31 @@
+{
+  "id": "10-reversal",
+  "description": "Reversal receipt — outcome=reversed, points to vector 01 via reversal_of_receipt_id.",
+  "spec_ref": "spec.md §4.2",
+  "expected_outcome": "verify_pass",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T17:00:00Z",
+    "action": {
+      "category": "purchase",
+      "human_summary": "Refunded the AMC Boston Common 19 ticket purchase ($34.50).",
+      "outcome": "reversed",
+      "counterparty_did": "did:key:z6MkkjfwJUSqmSB49ZaMWLuwPtmn9X4ZnZ4B6yPnfDE5cXKp",
+      "counterparty_label": "AMC Boston Common 19",
+      "amount": {
+        "currency": "USD",
+        "cents": 3450
+      },
+      "reversal_of_receipt_id": "11111111-1111-4111-8111-111111111111"
+    },
+    "signature": "GK/zG6C9XOBowIgxF8diWVgfSixEWzj9asLfeDyDzzzIiQLq20jqM5QfY8qk4yE+m7aRc8+AD3tPb/uEWZ5gDw=="
+  }
+}

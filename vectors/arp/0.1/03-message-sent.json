@@ -1,0 +1,26 @@
+{
+  "id": "03-message-sent",
+  "description": "message_sent category, no amount, with counterparty.",
+  "spec_ref": "spec.md §4.3",
+  "expected_outcome": "verify_pass",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "33333333-3333-4333-8333-333333333333",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T15:00:00Z",
+    "action": {
+      "category": "message_sent",
+      "human_summary": "Sent a reply to Maria Hopper confirming the Friday meeting at 4pm.",
+      "outcome": "completed",
+      "counterparty_did": "did:key:z6MkkjfwJUSqmSB49ZaMWLuwPtmn9X4ZnZ4B6yPnfDE5cXKp",
+      "counterparty_label": "Maria Hopper"
+    },
+    "signature": "bf05YJ2YthPLUbPGMO96q/Nq04fWIHCK7YXSOra24Ct9BtSF0luDAwGC9TQa7uBgQdpJ0D6BFdBKjsSEC1KFCQ=="
+  }
+}
