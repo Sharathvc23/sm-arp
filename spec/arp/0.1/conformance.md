@@ -56,6 +56,10 @@ runtime, which protocol versions (including the ARP version), the
   cases) are owned by `sm-conformance`, not ARP.
 - **What a badge does and does not prove** is per `sm-conformance/SPEC.md` §3 and
   the trust ladder in §11 — summarized in §4 below for the ARP Mark.
+- **Producing the badge** is a thin call into the primitive: `conformance.arp.badge`
+  (install the `conformance` extra) pins the ARP vector corpus and signs the envelope
+  via `sm-conformance`. ARP imports the primitive rather than re-implementing it —
+  it is sm-conformance's first consumer in code, not only in prose.
 
 ## 4. The ARP Conformance Mark
 

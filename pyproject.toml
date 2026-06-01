@@ -17,6 +17,13 @@ dependencies = [
     "jcs>=0.2",
 ]
 
+[project.optional-dependencies]
+# Producing/verifying the ARP conformance badge consumes the sm-conformance
+# primitive. Kept out of core deps: parsing/verifying receipts does not need it.
+conformance = [
+    "sm-conformance @ git+https://github.com/Sharathvc23/sm-conformance.git",
+]
+
 
 [tool.setuptools.packages.find]
 where = ["."]
