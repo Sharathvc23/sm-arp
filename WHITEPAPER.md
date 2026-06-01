@@ -103,7 +103,7 @@ ARP is the **human-facing accountability layer above the tool and transport prot
                                                                      +-----------------+
 ```
 
-**Conformance.** A runtime implementing ARP proves it by shipping a signed conformance badge. ARP owns its receipt vectors and conformance criteria; it **points at [`sm-conformance`](https://github.com/Sharathvc23/sm-conformance)** for the badge envelope and verifier rather than minting its own — the badge mechanism is a shared substrate, and ARP is its first consumer.
+**Conformance.** A runtime implementing ARP proves it by shipping a signed conformance badge. ARP owns its receipt vectors and conformance criteria; it **imports [`sm-conformance`](https://github.com/Sharathvc23/sm-conformance)** for the badge envelope and verifier rather than minting its own (`conformance/arp/badge.py` pins the ARP corpus and signs through the primitive) — the badge mechanism is a shared substrate, and ARP is its first consumer in code, not only in prose.
 
 ## 7. Composition With Sister Primitives
 
