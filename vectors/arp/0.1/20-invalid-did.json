@@ -1,0 +1,24 @@
+{
+  "id": "20-invalid-did",
+  "description": "issuer_did is not a valid did:key — schema fails before signature check.",
+  "spec_ref": "spec.md §3.3",
+  "expected_outcome": "schema_fail",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "04040404-0404-4404-8404-040404040404",
+    "issuer_did": "did:web:not-a-key:invalid",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T20:00:00Z",
+    "action": {
+      "category": "message_sent",
+      "human_summary": "A message with a malformed issuer_did.",
+      "outcome": "completed"
+    },
+    "signature": "pBrerGyMyMIxWMrWRNjHzuQKa42mPCBGtZ8P4Zt9xy1V2zJOlJkVgK6hFyjtqZIvW5qga6ENtZbf2KKo0ps0Cg=="
+  }
+}

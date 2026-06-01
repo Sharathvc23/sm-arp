@@ -1,0 +1,40 @@
+{
+  "id": "15-with-tool-invocations",
+  "description": "Purchase with MCP tool_invocations recorded in evidence.",
+  "spec_ref": "spec.md §5",
+  "expected_outcome": "verify_pass",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T18:30:00Z",
+    "action": {
+      "category": "purchase",
+      "human_summary": "Bought 1 dozen organic eggs from FreshGrocer for $7.99.",
+      "outcome": "completed",
+      "amount": {
+        "currency": "USD",
+        "cents": -799
+      },
+      "counterparty_label": "FreshGrocer"
+    },
+    "evidence": {
+      "tool_invocations": [
+        {
+          "tool_did": "did:key:z6MkkjfwJUSqmSB49ZaMWLuwPtmn9X4ZnZ4B6yPnfDE5cXKp",
+          "mcp_server_uri": "https://mcp.freshgrocer.example/v1",
+          "request_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "response_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "timestamp": "2026-05-21T18:29:55Z"
+        }
+      ]
+    },
+    "signature": "W7T0Lk4Qj1Wi8RtNlnr43xcv0lMTMfsVjkuyknYBc+6LkyXGouVaOWPG/Xjc/uutu+OoeqEWGe+55IEB/mTxAg=="
+  }
+}

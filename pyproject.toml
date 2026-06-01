@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sm-arp"
+version = "0.1.0"
+description = "Agency Receipt Protocol — receipt envelope spec + language-agnostic conformance harness. Points at sm-conformance for the signed badge."
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+dependencies = [
+    "pytest>=8.0",
+    "jsonschema>=4.21",
+    "referencing>=0.30",
+    "cryptography>=42",
+    "base58>=2.1",
+    "jcs>=0.2",
+]
+
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["conformance*"]
+
+[tool.pytest.ini_options]
+testpaths = ["conformance"]

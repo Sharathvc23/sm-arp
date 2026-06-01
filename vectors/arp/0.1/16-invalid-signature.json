@@ -1,0 +1,28 @@
+{
+  "id": "16-invalid-signature",
+  "description": "Body tampered after signing (amount changed from -$4.25 to -$425).",
+  "spec_ref": "spec.md §6.3 step 5",
+  "expected_outcome": "signature_fail",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T19:00:00Z",
+    "action": {
+      "category": "purchase",
+      "human_summary": "Bought a coffee at Pavement Coffeehouse for $4.25.",
+      "outcome": "completed",
+      "amount": {
+        "currency": "USD",
+        "cents": -42500
+      }
+    },
+    "signature": "/qCxFDBGyPta/Xk/vrHzjU1X0HpLmhgR6hOGwv3hBrwnvS+NB+M1+CUrh858JSkhWPgs5Beh6QDRrMack5yMDg=="
+  }
+}
