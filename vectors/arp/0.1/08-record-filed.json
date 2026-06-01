@@ -1,0 +1,41 @@
+{
+  "id": "08-record-filed",
+  "description": "record_filed (tax form) with jurisdiction and requires_review.",
+  "spec_ref": "spec.md §4.3, §8, §9",
+  "expected_outcome": "verify_pass",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "88888888-8888-4888-8888-888888888888",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T16:15:00Z",
+    "action": {
+      "category": "record_filed",
+      "human_summary": "Filed Form W-9 with Acme Robotics for the consulting engagement.",
+      "outcome": "completed",
+      "counterparty_label": "Acme Robotics, Inc.",
+      "machine_payload": {
+        "form_id": "IRS-W9",
+        "tax_year": 2026
+      }
+    },
+    "jurisdiction": {
+      "principal_residence": "US-MA",
+      "action_locus": "US",
+      "applicable_regimes": [
+        "irs"
+      ]
+    },
+    "accessibility": {
+      "summary_language": "en-US",
+      "complexity_level": "complex",
+      "requires_review": true
+    },
+    "signature": "SArAQqc7kaZV4gbQdBXr276TvpLAoyqK43f70rk32N6CGfqliQmeakNw/XmJcmIA/YVJLPNktqK9oMp6+TfWBg=="
+  }
+}

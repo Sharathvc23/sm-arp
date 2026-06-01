@@ -1,0 +1,55 @@
+{
+  "id": "02-purchase-full",
+  "description": "Purchase with every optional sub-object populated. Strict pass.",
+  "spec_ref": "spec.md §3, §4, §5, §7, §8, §9",
+  "expected_outcome": "verify_pass",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "22222222-2222-4222-8222-222222222222",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T14:30:00Z",
+    "action": {
+      "category": "purchase",
+      "human_summary": "Booked a haircut at Supercuts Brookline for May 28 at 3pm, $35.",
+      "outcome": "completed",
+      "counterparty_did": "did:key:z6MkkjfwJUSqmSB49ZaMWLuwPtmn9X4ZnZ4B6yPnfDE5cXKp",
+      "counterparty_label": "Supercuts Brookline",
+      "amount": {
+        "currency": "USD",
+        "cents": -3500
+      },
+      "machine_payload": {
+        "booking_ref": "SC-998877",
+        "scheduled_for": "2026-05-28T15:00:00-04:00"
+      }
+    },
+    "authority_chain": [
+      "dat:did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX:personal-services-budget-q2"
+    ],
+    "evidence": {
+      "external_refs": [
+        "SC-998877"
+      ],
+      "prompt_lineage_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "jurisdiction": {
+      "principal_residence": "US-MA",
+      "action_locus": "US-MA",
+      "applicable_regimes": [
+        "ccpa"
+      ]
+    },
+    "accessibility": {
+      "summary_language": "en-US",
+      "complexity_level": "simple",
+      "requires_review": false
+    },
+    "signature": "JGluHOXLBkz7qUBh58ANQuKuODm1PZfLL2D/pno5Gxgao6ondGge1dsb9U07sCDeI9g5xtAKHxr1G2GUqGG3Ag=="
+  }
+}

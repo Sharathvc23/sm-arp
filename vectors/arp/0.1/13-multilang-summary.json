@@ -1,0 +1,38 @@
+{
+  "id": "13-multilang-summary",
+  "description": "Accessibility with alt_summaries in two non-English locales.",
+  "spec_ref": "spec.md §9.2",
+  "expected_outcome": "verify_pass",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T18:00:00Z",
+    "action": {
+      "category": "message_sent",
+      "human_summary": "Replied to Akira Tanaka thanking them for the robotics demo invitation.",
+      "outcome": "completed"
+    },
+    "accessibility": {
+      "summary_language": "en-US",
+      "alt_summaries": [
+        {
+          "lang": "ja-JP",
+          "summary": "田中明さんにロボティクスデモへのご招待のお礼を返信しました。"
+        },
+        {
+          "lang": "es-MX",
+          "summary": "Respondiste a Akira Tanaka agradeciéndole la invitación a la demostración de robótica."
+        }
+      ],
+      "complexity_level": "simple"
+    },
+    "signature": "4CDtdqoxdy6lccZq4fLT5fQRZf8XSV4aTqy6PIJaQLJzjA1PoJd05fUUhQIFfdha08/jeZ1xj7CZn/JUqXNqCg=="
+  }
+}
