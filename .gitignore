@@ -6,3 +6,7 @@ __pycache__/
 .venv/
 dist/
 build/
+
+# Agent tooling (never commit dev artifacts)
+.claude/
+.DS_Store
