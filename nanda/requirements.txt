@@ -1,0 +1,13 @@
+# NANDA Causal Delegation Trace prototype — runtime dependencies.
+# Install with:  pip install -r requirements.txt
+#
+# These are the only deps. The verifier itself (_arp_v01/) and the JSON
+# Schemas (_arp_v01/schemas/) are vendored alongside this file as a
+# v0.1.0 snapshot of github.com/Sharathvc23/sm-arp, so no `pip install
+# sm-arp` is required.
+
+jcs>=0.2                  # RFC 8785 JSON Canonicalization Scheme — signing input
+base58>=2.1               # base58btc encoding for did:key
+cryptography>=42          # Ed25519 sign + verify
+jsonschema>=4.21          # JSON Schema 2020-12 validation
+referencing>=0.30         # cross-file $ref resolution for the vendored schemas
