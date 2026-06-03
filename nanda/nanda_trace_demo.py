@@ -7,7 +7,7 @@ Ed25519 verifier vendored at ``./_arp_v01/`` (a snapshot of sm-arp v0.1.0)
 before exiting.
 
 This script is intentionally self-contained: clone or copy this directory
-to anywhere, install requirements.txt, and run. No `pip install sm-arp`
+to any location, install requirements.txt, and run. No `pip install sm-arp`
 required.
 
     Receipt 1  (Human Principal grants Agent A          authority_granted)
@@ -21,8 +21,8 @@ required.
     Receipt 3  (Agent B shares data with NANDA Registry data_shared)
 
 The trace is deterministic: seeds, UUIDs, and timestamps are all fixed so
-every run produces a byte-identical nanda_interaction_trace.json that MIT
-researchers can diff, hash, and pin in their algorithms.
+every run produces a byte-identical nanda_interaction_trace.json that any
+consumer can diff, hash, and pin against.
 
 Run::
 

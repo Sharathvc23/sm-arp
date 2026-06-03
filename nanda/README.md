@@ -62,7 +62,7 @@ covers), so neither can be tampered with after issuance.
 
 ## Reverse-traversal algorithm
 
-The clean version, for MIT trace algorithms:
+Reference Python implementation:
 
 ```python
 def walk_authority_chain(receipt, receipts_by_id):
@@ -199,9 +199,9 @@ This trace demonstrates that the receipt format isn't just per-action — it's
 **inter-action**: three signed receipts compose into a directed graph of
 delegated authority that algorithms can traverse, audit, and reason about.
 
-## Going deeper — the parent project
+## Related project
 
-This directory is the **prototype**. The full specification, conformance
+This repository is the **prototype**. The full specification, conformance
 vectors (22 of them), additional schemas, and a developer-facing CLI
 (`arp verify`, `arp render`, `arp walk-authority`, `arp keygen`, `arp issue`,
 `arp grant`, `arp revoke`, `arp demo`) live in the parent project:
