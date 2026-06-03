@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
+import base64
 import json
-import sys
 from pathlib import Path
 from typing import Optional
 
 import typer
 
-from arp_cli import corpus, narrate
+from arp_cli import corpus, issue as _issue, narrate
 from conformance.arp import compute_chain_link, verify_receipt
 
 app = typer.Typer(
@@ -522,6 +522,242 @@ def demo() -> None:
         bold=True,
     )
     narrate.divider()
+
+
+# ── write-side: keygen, issue, grant, revoke ──────────────────────
+
+
+def _emit_receipt(receipt: dict, out: Optional[Path]) -> None:
+    """Write the receipt to --out or stdout, then verify it (paranoia)."""
+    text = json.dumps(receipt, indent=2, ensure_ascii=False) + "\n"
+    if out:
+        out.write_text(text)
+        typer.secho(f"wrote {out}", fg=typer.colors.GREEN)
+    else:
+        typer.echo(text, nl=False)
+
+    # Self-check: a receipt we just signed should always verify.
+    ok_flag, stage, detail = _verify_one(receipt, mode="strict")
+    if not ok_flag:
+        typer.secho(
+            f"\nWARNING: emitted receipt failed self-verification at {stage}: {detail}",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+
+def _resolve_seed(spec: str) -> bytes:
+    """Parse --issuer-key and warn if it's a well-known demo seed."""
+    try:
+        seed = _issue.parse_seed(spec)
+    except ValueError as e:
+        typer.secho(f"error: --issuer-key: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2)
+    if _issue.seed_is_well_known(seed):
+        typer.secho(
+            "warning: this is a well-known demo seed; do not sign production traffic with it.",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
+    return seed
+
+
+@app.command()
+def keygen(
+    seed: Optional[str] = typer.Option(
+        None,
+        "--seed",
+        help="Use a specific 32-byte ASCII seed (demo only). Default: cryptographically random.",
+    ),
+    out: Optional[Path] = typer.Option(
+        None, "--out", "-o", help="Write base64(seed) to this file (mode 0600). If omitted, prints seed to stdout."
+    ),
+) -> None:
+    """Generate an Ed25519 keypair and emit its did:key.
+
+    Without --out, prints both the did:key and the base64-encoded seed
+    (the private key) to stdout — save the seed somewhere safe.
+
+    With --out, writes the seed to a file with mode 0600 and prints
+    only the did:key to stdout.
+    """
+    seed_bytes = (
+        _issue.parse_seed(seed) if seed else _issue.random_seed()
+    )
+    did = _issue.did_key_for_seed(seed_bytes)
+    seed_b64 = base64.b64encode(seed_bytes).decode("ascii")
+
+    if out:
+        out.write_text(seed_b64 + "\n")
+        try:
+            out.chmod(0o600)
+        except OSError:
+            pass
+        typer.secho(f"wrote seed to {out} (mode 0600)", fg=typer.colors.GREEN)
+        typer.echo(f"did: {did}")
+    else:
+        typer.echo(f"did:  {did}")
+        typer.echo(f"seed: base64:{seed_b64}")
+        typer.secho(
+            "\nSAVE THE SEED. It is the private key. Anyone with it can sign as this DID.",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
+
+
+@app.command()
+def issue(
+    category: str = typer.Argument(..., help="Action category — see `arp vectors list` for valid values."),
+    issuer_key: str = typer.Option(..., "--issuer-key", help="Ed25519 seed: 32-byte ASCII, base64:..., or @path/to/file."),
+    principal: str = typer.Option(..., "--principal", help="Principal did:key (the human on whose behalf the agent is acting)."),
+    summary: str = typer.Option(..., "--summary", "-s", help="One-sentence human_summary (≤ 280 chars)."),
+    outcome: str = typer.Option("completed", "--outcome", help="One of: completed, failed, partial, reversed, pending."),
+    counterparty: Optional[str] = typer.Option(None, "--counterparty", help="Counterparty did:key."),
+    counterparty_label: Optional[str] = typer.Option(None, "--counterparty-label", help="Human-readable counterparty name."),
+    amount_cents: Optional[int] = typer.Option(None, "--amount", help="Amount in cents (negative = outgoing)."),
+    currency: str = typer.Option("USD", "--currency", help="ISO 4217 currency (used only if --amount given)."),
+    granted_by: Optional[str] = typer.Option(None, "--granted-by", help="receipt_id of the authority_granted receipt that authorizes this action."),
+    reverses: Optional[str] = typer.Option(None, "--reverses", help="receipt_id of the receipt this one reverses (issuer must match)."),
+    payload: Optional[str] = typer.Option(None, "--payload", help="JSON object for action.machine_payload."),
+    receipt_id: Optional[str] = typer.Option(None, "--id", help="Override the receipt_id (default: random UUIDv4)."),
+    issued_at: Optional[str] = typer.Option(None, "--issued-at", help="Override issued_at (default: now, UTC second precision)."),
+    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Write the receipt to this file (default: stdout)."),
+) -> None:
+    """Issue a fresh signed ARP receipt.
+
+    For category=authority_granted or authority_revoked, prefer the
+    convenience commands `arp grant` and `arp revoke` — they enforce the
+    required machine_payload shape automatically.
+    """
+    seed = _resolve_seed(issuer_key)
+    issuer_did = _issue.did_key_for_seed(seed)
+
+    try:
+        mp = _issue.parse_payload(payload)
+        action = _issue.build_action(
+            category=category,
+            human_summary=summary,
+            outcome=outcome,
+            counterparty_did=counterparty,
+            counterparty_label=counterparty_label,
+            amount_cents=amount_cents,
+            currency=currency,
+            granted_by_receipt_id=granted_by,
+            reversal_of_receipt_id=reverses,
+            machine_payload=mp,
+        )
+        receipt = _issue.build_receipt(
+            issuer_did=issuer_did,
+            principal_did=principal,
+            action=action,
+            receipt_id=receipt_id,
+            issued_at=issued_at,
+        )
+    except ValueError as e:
+        typer.secho(f"error: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2)
+
+    _issue.sign(seed, receipt)
+    _emit_receipt(receipt, out)
+
+
+@app.command()
+def grant(
+    issuer_key: str = typer.Option(..., "--issuer-key", help="Ed25519 seed of the issuer (principal or sub-delegating agent)."),
+    principal: str = typer.Option(..., "--principal", help="Principal did:key — the human at the root of the chain. Per spec §4.5 step 2, MUST be the same for every grant in a chain."),
+    to: str = typer.Option(..., "--to", help="did:key of the agent receiving the authority."),
+    scope: str = typer.Option(..., "--scope", help="Comma-separated action categories (or '*' for any). Example: 'data_shared,message_sent'."),
+    expires: str = typer.Option(..., "--expires", help="grant_expires_at — RFC 3339 UTC second-precision (e.g. 2026-12-31T23:59:59Z)."),
+    summary: Optional[str] = typer.Option(None, "--summary", "-s", help="Override the auto-generated human_summary."),
+    granted_by: Optional[str] = typer.Option(None, "--granted-by", help="receipt_id of the parent grant (set for sub-delegation; omit for genesis grants)."),
+    receipt_id: Optional[str] = typer.Option(None, "--id", help="Override the receipt_id."),
+    issued_at: Optional[str] = typer.Option(None, "--issued-at", help="Override issued_at."),
+    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Write the receipt to this file."),
+) -> None:
+    """Emit an authority_granted receipt with the required machine_payload shape.
+
+    Convenience wrapper around `arp issue authority_granted` that fills in
+    machine_payload.granted_scope/granted_to_did/grant_expires_at.
+    """
+    seed = _resolve_seed(issuer_key)
+    issuer_did = _issue.did_key_for_seed(seed)
+    scope_list = [s.strip() for s in scope.split(",") if s.strip()]
+    if not scope_list:
+        typer.secho("error: --scope must contain at least one category", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2)
+
+    auto_summary = (
+        f"Granted {to} authority over {scope} until {expires}."
+        if not granted_by
+        else f"Sub-delegated authority over {scope} to {to} until {expires}."
+    )
+
+    try:
+        action = _issue.build_action(
+            category="authority_granted",
+            human_summary=summary or auto_summary,
+            outcome="completed",
+            granted_by_receipt_id=granted_by,
+            machine_payload={
+                "granted_scope": scope_list,
+                "granted_to_did": to,
+                "grant_expires_at": expires,
+            },
+        )
+        receipt = _issue.build_receipt(
+            issuer_did=issuer_did,
+            principal_did=principal,
+            action=action,
+            receipt_id=receipt_id,
+            issued_at=issued_at,
+        )
+    except ValueError as e:
+        typer.secho(f"error: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2)
+
+    _issue.sign(seed, receipt)
+    _emit_receipt(receipt, out)
+
+
+@app.command()
+def revoke(
+    issuer_key: str = typer.Option(..., "--issuer-key", help="Ed25519 seed of the principal who originally issued the grant."),
+    principal: str = typer.Option(..., "--principal", help="Principal did:key — must equal the original grant's principal_did."),
+    revokes: str = typer.Option(..., "--revokes", help="receipt_id of the authority_granted receipt being revoked."),
+    summary: Optional[str] = typer.Option(None, "--summary", "-s", help="Override the auto-generated human_summary."),
+    receipt_id: Optional[str] = typer.Option(None, "--id", help="Override the receipt_id."),
+    issued_at: Optional[str] = typer.Option(None, "--issued-at", help="Override issued_at."),
+    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Write the receipt to this file."),
+) -> None:
+    """Emit an authority_revoked receipt that supersedes a prior grant.
+
+    Per spec §4.5 step 6, strict verifiers reject any action receipt
+    referencing a grant that has been revoked before the action's issued_at.
+    """
+    seed = _resolve_seed(issuer_key)
+    issuer_did = _issue.did_key_for_seed(seed)
+
+    try:
+        action = _issue.build_action(
+            category="authority_revoked",
+            human_summary=summary or f"Revoked grant {revokes}.",
+            outcome="completed",
+            machine_payload={"revokes_receipt_id": revokes},
+        )
+        receipt = _issue.build_receipt(
+            issuer_did=issuer_did,
+            principal_did=principal,
+            action=action,
+            receipt_id=receipt_id,
+            issued_at=issued_at,
+        )
+    except ValueError as e:
+        typer.secho(f"error: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2)
+
+    _issue.sign(seed, receipt)
+    _emit_receipt(receipt, out)
 
 
 # ── entry point ────────────────────────────────────────────────────
