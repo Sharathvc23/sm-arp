@@ -2,8 +2,13 @@
 """NANDA Causal Delegation Trace demo — ARP v0.1.
 
 Produces three Ed25519-signed Agency Receipts that form a directed graph of
-delegated authority, then validates the output against the in-repo sm-arp
-JSON Schemas and Ed25519 verifier before exiting.
+delegated authority, then validates the output against the JSON Schemas and
+Ed25519 verifier vendored at ``./_arp_v01/`` (a snapshot of sm-arp v0.1.0)
+before exiting.
+
+This script is intentionally self-contained: clone or copy this directory
+to anywhere, install requirements.txt, and run. No `pip install sm-arp`
+required.
 
     Receipt 1  (Human Principal grants Agent A          authority_granted)
         ↑
@@ -19,9 +24,10 @@ The trace is deterministic: seeds, UUIDs, and timestamps are all fixed so
 every run produces a byte-identical nanda_interaction_trace.json that MIT
 researchers can diff, hash, and pin in their algorithms.
 
-Run from the sm-arp repo root::
+Run::
 
-    python nanda/nanda_trace_demo.py
+    pip install -r requirements.txt
+    python nanda_trace_demo.py
 
 Exits 0 on success; nonzero on any schema, signature, or authority-chain
 violation. The JSON output is written next to this script.
@@ -34,12 +40,17 @@ import json
 import sys
 from pathlib import Path
 
+# Make the vendored _arp_v01 package importable whether this script is run
+# from inside its own directory or from a parent. We add the script's own
+# directory to sys.path so `from _arp_v01 import ...` works either way.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import base58
 import jcs
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from conformance.arp import verify_receipt
+from _arp_v01 import verify_receipt
 
 
 # ── deterministic demo identities ───────────────────────────────────
