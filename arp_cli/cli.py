@@ -202,25 +202,35 @@ def render(
         "--show-crypto",
         help="Include DIDs, UUIDs, hashes, and a signature snippet. Drops back into the developer view.",
     ),
+    lang: Optional[str] = typer.Option(
+        None,
+        "--lang",
+        help="BCP 47 language tag (e.g. 'de-DE', 'ja-JP', 'es'). If accessibility.alt_summaries has a match, render that instead of the primary summary (spec §9.2).",
+    ),
 ) -> None:
     """Render a receipt or trace as a human-facing diary entry.
 
     The Agency Log view from spec §10.1 — what the principal sees in their
     diary application. Drops DIDs, UUIDs, hashes, and signatures by default;
     the cryptographic guarantees those provide live BEHIND the rendering,
-    not IN it. For arrays of receipts, sorts by issued_at and surfaces
-    authority links in plain English.
+    not IN it.
+
+    Every receipt is verified before rendering. Forged or malformed receipts
+    are rendered with a prominent warning instead of a misleading ✓ — the
+    body is still shown for reference but the human is told not to rely on
+    it. For arrays of receipts, sorts by issued_at and surfaces both
+    authority links and previous_receipt_hash links inline.
     """
     body = _load(file)
     if isinstance(body, list):
-        text = _render.render_trace(body, show_crypto=show_crypto)
+        text = _render.render_trace(body, show_crypto=show_crypto, lang=lang)
     else:
         receipt = (
             body["receipt"]
             if isinstance(body, dict) and "receipt" in body and "version" not in body
             else body
         )
-        text = _render.render_receipt(receipt, show_crypto=show_crypto)
+        text = _render.render_receipt(receipt, show_crypto=show_crypto, lang=lang)
     typer.echo(text)
 
 

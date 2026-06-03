@@ -11,15 +11,24 @@ algorithms and audit byte-by-byte.
 - **Spec (normative):** [`../spec/arp/0.1/spec.md`](../spec/arp/0.1/spec.md), in particular §4.6 (authority chain) and §6 (canonical signing).
 - **Schemas:** [`../schema/arp/0.1/*.schema.json`](../schema/arp/0.1/) (JSON Schema 2020-12).
 - **Verifier:** [`../conformance/arp/__init__.py`](../conformance/arp/__init__.py) — `verify_receipt(receipt, mode="strict")`.
+- **CLI (developer tool):** [`../arp_cli/`](../arp_cli/) — `arp verify`, `arp walk-authority`, `arp render`, and the write-side (`arp keygen`/`issue`/`grant`/`revoke`). See [§Using the `arp` CLI](#using-the-arp-cli) below.
 
 ## TL;DR
 
+Two ways to interact with this trace:
+
 ```sh
-.venv/bin/python nanda/nanda_trace_demo.py    # (run from the sm-arp repo root)
+# (1) Regenerate + self-validate via the standalone script (no CLI install needed):
+.venv/bin/python nanda/nanda_trace_demo.py
+
+# (2) Or operate on the existing JSON via the arp CLI (pip install -e ".[cli]"):
+arp verify          nanda/nanda_interaction_trace.json   # schema + Ed25519
+arp walk-authority  nanda/nanda_interaction_trace.json   # §4.5 chain walk
+arp render          nanda/nanda_interaction_trace.json   # human-facing diary view
 ```
 
-Produces [`nanda_interaction_trace.json`](./nanda_interaction_trace.json) — a
-JSON array of three Ed25519-signed receipts — and self-validates it against
+The standalone script produces [`nanda_interaction_trace.json`](./nanda_interaction_trace.json) —
+a JSON array of three Ed25519-signed receipts — and self-validates it against
 the in-repo schemas and the §4.5 strict-mode authority-chain walk. Exits 0 on
 success, nonzero on any violation. Deterministic: every run produces a
 byte-identical file.
@@ -169,6 +178,83 @@ For pure schema-only validation, point any JSON Schema 2020-12 validator at
 `schema/arp/0.1/receipt.schema.json`. The schemas reference each other by
 relative filename; you'll need to seed them into your validator's registry
 (see `conformance/arp/__init__.py` `_load_registry()` for the exact pattern).
+
+## Using the `arp` CLI
+
+`pip install -e ".[cli]"` from the repo root exposes the `arp` entry point.
+Everything below operates on the trace JSON in this directory.
+
+```sh
+# Verify all three receipts (schema + Ed25519 + hash chain). Auto-builds
+# the priors map from the trace so any previous_receipt_hash links resolve.
+arp verify nanda/nanda_interaction_trace.json
+#   ✓ Receipt 1 [10000001-…] → accepted
+#   ✓ Receipt 2 [20000002-…] → accepted
+#   ✓ Receipt 3 [30000003-…] → accepted
+
+# Walk the authority chain back to the root grant, enforcing every spec
+# §4.5 strict-mode check at each hop (same principal, parent is a grant,
+# unexpired, in-scope).
+arp walk-authority nanda/nanda_interaction_trace.json
+#   30000003-… (data_shared)
+#   └─ 20000002-… (authority_granted)
+#     └─ 10000001-… (authority_granted)
+#   ✓ chain length = 3; root grant = 10000001-…
+
+# Render as the principal's diary view (spec §10.1 Agency Log).
+# Verifies before rendering — FORGED/MALFORMED receipts get a prominent
+# warning instead of a misleading ✓. Authority links surfaced in prose.
+arp render nanda/nanda_interaction_trace.json
+#   Wed Jun 3, 2026 — 12:00 PM UTC  VERIFIED
+#     ✓ Granted Agent A authority to share data and send messages on my behalf,
+#       including the right to sub-delegate.
+#     taken by you (the principal)
+#
+#   Wed Jun 3, 2026 — 12:15 PM UTC  VERIFIED
+#     ✓ Sub-delegated data-sharing authority to Agent B under the Human Principal's grant.
+#     taken by an agent on your behalf
+#       ↳ under authority granted at Wed Jun 3, 2026 — 12:00 PM UTC:
+#          "Granted Agent A authority to share data and send messages on my beh…"
+#   ...
+```
+
+To inspect a single receipt with all fields (the developer view), use
+`arp inspect <file>`. To pull the trace through the full 7-step demo
+(adds purchase / GDPR / hash-chain / tamper-detection vectors around the
+NANDA trace), use `arp demo`.
+
+### Build a fresh delegation graph from the CLI
+
+The CLI's write-side (`arp keygen` / `arp issue` / `arp grant` / `arp revoke`)
+can reproduce this trace from scratch in shell — no Python needed:
+
+```sh
+HUMAN='your-32-byte-ascii-seed-for-h!!'
+AGENT_A='your-32-byte-ascii-seed-for-a!!'
+AGENT_B='your-32-byte-ascii-seed-for-b!!'
+
+H=$(arp keygen --seed="$HUMAN"   | awk '/^did:/{print $2}')
+A=$(arp keygen --seed="$AGENT_A" | awk '/^did:/{print $2}')
+B=$(arp keygen --seed="$AGENT_B" | awk '/^did:/{print $2}')
+
+arp grant --issuer-key="$HUMAN"   --principal="$H" --to="$A" \
+          --scope="data_shared,message_sent,authority_granted" \
+          --expires="2026-12-31T23:59:59Z" --out=r1.json
+
+R1=$(jq -r .receipt_id r1.json)
+arp grant --issuer-key="$AGENT_A" --principal="$H" --to="$B" \
+          --scope="data_shared" --expires="2026-12-31T23:59:59Z" \
+          --granted-by="$R1" --out=r2.json
+
+R2=$(jq -r .receipt_id r2.json)
+arp issue data_shared --issuer-key="$AGENT_B" --principal="$H" \
+          --summary="Shared compliance summary with the NANDA Registry." \
+          --counterparty-label="NANDA Registry" --granted-by="$R2" \
+          --payload='{"fields_shared":["compliance_summary"]}' --out=r3.json
+
+jq -s '.' r1.json r2.json r3.json > trace.json
+arp verify trace.json && arp walk-authority trace.json
+```
 
 ## Identities
 
