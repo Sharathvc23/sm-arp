@@ -23,11 +23,17 @@ dependencies = [
 conformance = [
     "sm-conformance @ git+https://github.com/Sharathvc23/sm-conformance.git",
 ]
+# Command-line tool — `pip install sm-arp[cli]` exposes the `arp` entry point.
+cli = [
+    "typer>=0.12",
+]
 
+[project.scripts]
+arp = "arp_cli.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["conformance*"]
+include = ["conformance*", "arp_cli*"]
 
 [tool.pytest.ini_options]
 testpaths = ["conformance"]
