@@ -41,7 +41,8 @@ first consumer.
    MUST pass; every negative vector MUST be rejected at the documented stage.
 3. Produce a signed conformance badge with
    [`sm-conformance`](https://github.com/Sharathvc23/sm-conformance) and ship it
-   at your runtime's `.nanda/conformance.json`.
+   at your runtime's `.nanda/conformance.json` — and, if you serve it over HTTP,
+   at the canonical `/.well-known/conformance.json` (see sm-conformance SPEC §3.2).
 4. Submit your runtime to the conformance registry at
    `labs.stellarminds.ai/conformance` for independent re-verification — lab
    re-run, counter-signature, or attested CI (a self-signed badge alone is not
