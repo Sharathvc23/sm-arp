@@ -1,0 +1,69 @@
+[
+  {
+    "version": "arp/0.1",
+    "receipt_id": "10000001-0001-4001-8001-100000000001",
+    "issuer_did": "did:key:z6MkoB8T2J2oPPCujP2qLSZn3jUM8b7dci5zmyWy4LEZoKUa",
+    "principal_did": "did:key:z6MkoB8T2J2oPPCujP2qLSZn3jUM8b7dci5zmyWy4LEZoKUa",
+    "issued_at": "2026-06-03T12:00:00Z",
+    "action": {
+      "category": "authority_granted",
+      "human_summary": "Granted Agent A authority to share data and send messages on my behalf, including the right to sub-delegate.",
+      "outcome": "completed",
+      "machine_payload": {
+        "granted_scope": [
+          "data_shared",
+          "message_sent",
+          "authority_granted"
+        ],
+        "granted_to_did": "did:key:z6Mkgf6JomVa6Ha3rbrRsiHPDeRSNBsAEDSnM9sdMRomKKxh",
+        "grant_expires_at": "2026-12-31T23:59:59Z"
+      }
+    },
+    "signature": "U/aWwOP5767GBgzEzI5Qz5Qz7QnSvQBVnnDGKmcVuM5Vfbt5FR2FJuaaFbJBWzNdd2PowCbt8aH9zJKRE6kADA=="
+  },
+  {
+    "version": "arp/0.1",
+    "receipt_id": "20000002-0002-4002-8002-200000000002",
+    "issuer_did": "did:key:z6Mkgf6JomVa6Ha3rbrRsiHPDeRSNBsAEDSnM9sdMRomKKxh",
+    "principal_did": "did:key:z6MkoB8T2J2oPPCujP2qLSZn3jUM8b7dci5zmyWy4LEZoKUa",
+    "issued_at": "2026-06-03T12:15:00Z",
+    "action": {
+      "category": "authority_granted",
+      "human_summary": "Sub-delegated data-sharing authority to Agent B under the Human Principal's grant.",
+      "outcome": "completed",
+      "granted_by_receipt_id": "10000001-0001-4001-8001-100000000001",
+      "machine_payload": {
+        "granted_scope": [
+          "data_shared"
+        ],
+        "granted_to_did": "did:key:z6MkgFT4qfJvW8MC8GT4itsVyFGqtd9o4CDyosns8AqqPymw",
+        "grant_expires_at": "2026-12-31T23:59:59Z"
+      }
+    },
+    "signature": "PDcjYIDNc/snHkxBeH0oyyJXbxmZX3YVtPAP69Tlfgt0Rb3Y0JjKmFiDX7c0BdEqHTy4R/bvqE7E55Xd72OrBg=="
+  },
+  {
+    "version": "arp/0.1",
+    "receipt_id": "30000003-0003-4003-8003-300000000003",
+    "issuer_did": "did:key:z6MkgFT4qfJvW8MC8GT4itsVyFGqtd9o4CDyosns8AqqPymw",
+    "principal_did": "did:key:z6MkoB8T2J2oPPCujP2qLSZn3jUM8b7dci5zmyWy4LEZoKUa",
+    "issued_at": "2026-06-03T12:30:00Z",
+    "action": {
+      "category": "data_shared",
+      "human_summary": "Shared compliance summary with the NANDA Registry under delegated authority from the Human Principal.",
+      "outcome": "completed",
+      "counterparty_label": "NANDA Registry",
+      "granted_by_receipt_id": "20000002-0002-4002-8002-200000000002",
+      "machine_payload": {
+        "fields_shared": [
+          "compliance_summary"
+        ],
+        "purpose": "registry_attestation"
+      }
+    },
+    "authority_chain": [
+      "did:key:z6MkoB8T2J2oPPCujP2qLSZn3jUM8b7dci5zmyWy4LEZoKUa"
+    ],
+    "signature": "iHgS1gLRbJhcvCdX3eVE/8gHaWaIfP7sa91S7mQfMsKRuXkE5Wb/3u2CFyz+BmxkTQx9jEzkprlL3toIJrnzDQ=="
+  }
+]
