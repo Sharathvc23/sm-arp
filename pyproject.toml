@@ -36,4 +36,4 @@ where = ["."]
 include = ["conformance*", "arp_cli*"]
 
 [tool.pytest.ini_options]
-testpaths = ["conformance"]
+testpaths = ["conformance", "tests"]
