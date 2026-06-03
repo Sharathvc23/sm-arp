@@ -9,7 +9,7 @@ from typing import Optional
 
 import typer
 
-from arp_cli import corpus, issue as _issue, narrate
+from arp_cli import corpus, issue as _issue, narrate, render as _render
 from conformance.arp import compute_chain_link, verify_receipt
 
 app = typer.Typer(
@@ -189,6 +189,39 @@ def inspect(
             narrate.kv("witnesses", f"{len(ev['witness_signatures'])} co-signer(s)")
 
     typer.echo()
+
+
+# ── render ─────────────────────────────────────────────────────────
+
+
+@app.command()
+def render(
+    file: Path = typer.Argument(..., help="Path to a receipt JSON file (or an array of receipts)."),
+    show_crypto: bool = typer.Option(
+        False,
+        "--show-crypto",
+        help="Include DIDs, UUIDs, hashes, and a signature snippet. Drops back into the developer view.",
+    ),
+) -> None:
+    """Render a receipt or trace as a human-facing diary entry.
+
+    The Agency Log view from spec §10.1 — what the principal sees in their
+    diary application. Drops DIDs, UUIDs, hashes, and signatures by default;
+    the cryptographic guarantees those provide live BEHIND the rendering,
+    not IN it. For arrays of receipts, sorts by issued_at and surfaces
+    authority links in plain English.
+    """
+    body = _load(file)
+    if isinstance(body, list):
+        text = _render.render_trace(body, show_crypto=show_crypto)
+    else:
+        receipt = (
+            body["receipt"]
+            if isinstance(body, dict) and "receipt" in body and "version" not in body
+            else body
+        )
+        text = _render.render_receipt(receipt, show_crypto=show_crypto)
+    typer.echo(text)
 
 
 # ── walk-authority ─────────────────────────────────────────────────
