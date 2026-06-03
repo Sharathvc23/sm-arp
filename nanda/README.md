@@ -228,6 +228,4 @@ arp render          nanda/nanda_interaction_trace.json     # human-facing diary 
   for this trace.
 - **License:** MIT.
 - **Upstream:** [github.com/Sharathvc23/sm-arp](https://github.com/Sharathvc23/sm-arp).
-- **Contribution context:** prepared for Project NANDA (MIT Media Lab) at
-  an external request. ARP is runtime-agnostic and vendor-neutral by
-  design; this directory contains the prototype layer, not the spec itself.
+
