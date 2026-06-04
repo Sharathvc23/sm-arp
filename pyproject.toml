@@ -33,7 +33,7 @@ arp = "arp_cli.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["conformance*", "arp_cli*"]
+include = ["sm_arp*", "conformance*", "arp_cli*"]
 
 [tool.pytest.ini_options]
-testpaths = ["conformance", "tests"]
+testpaths = ["sm_arp", "conformance", "tests"]
