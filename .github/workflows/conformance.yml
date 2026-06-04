@@ -18,5 +18,8 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-      - run: pip install -e ".[conformance]"
-      - run: pytest -v conformance/
+      - run: pip install -e ".[conformance,cli,dev]"
+      # Full suite via testpaths (sm_arp lib + conformance + cli) — not just
+      # conformance/, so the consumable library's own tests gate every PR.
+      - run: pytest -v
+      - run: ruff check sm_arp/
