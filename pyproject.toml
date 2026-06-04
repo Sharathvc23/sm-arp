@@ -4,28 +4,36 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sm-arp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Agency Receipt Protocol — receipt envelope spec + language-agnostic conformance harness. Points at sm-conformance for the signed badge."
 requires-python = ">=3.11"
 license = {file = "LICENSE"}
+# Core = exactly what the `sm_arp` library imports to build / sign / verify /
+# store a receipt. A consumer that imports `sm_arp` inherits only these three —
+# no test runner, no schema validator. Conformance and CLI deps are extras.
 dependencies = [
-    "pytest>=8.0",
-    "jsonschema>=4.21",
-    "referencing>=0.30",
     "cryptography>=42",
     "base58>=2.1",
     "jcs>=0.2",
 ]
 
 [project.optional-dependencies]
-# Producing/verifying the ARP conformance badge consumes the sm-conformance
-# primitive. Kept out of core deps: parsing/verifying receipts does not need it.
+# Producing/verifying the ARP conformance badge. jsonschema/referencing back the
+# JSON-Schema validation in `conformance/`; sm-conformance supplies the signed
+# badge primitive. None of this is needed to build or verify a receipt.
 conformance = [
+    "jsonschema>=4.21",
+    "referencing>=0.30",
     "sm-conformance @ git+https://github.com/Sharathvc23/sm-conformance.git",
 ]
 # Command-line tool — `pip install sm-arp[cli]` exposes the `arp` entry point.
 cli = [
     "typer>=0.12",
+]
+# Everything needed to run the full test suite (lib + conformance + cli).
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
 ]
 
 [project.scripts]
