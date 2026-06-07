@@ -6,8 +6,20 @@ build-backend = "setuptools.build_meta"
 name = "sm-arp"
 version = "0.1.1"
 description = "Agency Receipt Protocol — receipt envelope spec + language-agnostic conformance harness. Points at sm-conformance for the signed badge."
+readme = "README.md"
 requires-python = ">=3.11"
 license = {file = "LICENSE"}
+authors = [{ name = "stellarminds.ai" }]
+keywords = ["arp", "agency-receipt", "accountability", "ed25519", "did-key", "agents", "receipts"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security :: Cryptography",
+]
 # Core = exactly what the `sm_arp` library imports to build / sign / verify /
 # store a receipt. A consumer that imports `sm_arp` inherits only these three —
 # no test runner, no schema validator. Conformance and CLI deps are extras.
@@ -38,6 +50,10 @@ dev = [
 
 [project.scripts]
 arp = "arp_cli.cli:main"
+
+[project.urls]
+Homepage = "https://labs.stellarminds.ai/arp"
+Repository = "https://github.com/Sharathvc23/sm-arp"
 
 [tool.setuptools.packages.find]
 where = ["."]
