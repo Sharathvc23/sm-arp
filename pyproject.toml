@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sm-arp"
-version = "0.1.1"
+version = "0.1.2"
 description = "Agency Receipt Protocol — receipt envelope spec + language-agnostic conformance harness. Points at sm-conformance for the signed badge."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -36,7 +36,7 @@ dependencies = [
 conformance = [
     "jsonschema>=4.21",
     "referencing>=0.30",
-    "sm-conformance @ git+https://github.com/Sharathvc23/sm-conformance.git",
+    "sm-conformance>=0.3.1",
 ]
 # Command-line tool — `pip install sm-arp[cli]` exposes the `arp` entry point.
 cli = [
