@@ -9,9 +9,6 @@ do not address.
 
 ## Status
 
-Working Draft v0.1, May 2026. Published-spec-first via
-[labs.stellarminds.ai/arp](https://labs.stellarminds.ai/arp).
-
 - **[WHITEPAPER.md](./WHITEPAPER.md)** — motivation, design choices, and how ARP fits the portfolio.
 - **[spec/arp/0.1/spec.md](./spec/arp/0.1/spec.md)** — the canonical normative document (RFC-style).
 
