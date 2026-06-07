@@ -9,4 +9,6 @@ build/
 
 # Agent tooling (never commit dev artifacts)
 .claude/
+.aider*
+docs/superpowers/
 .DS_Store
