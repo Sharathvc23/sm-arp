@@ -21,6 +21,10 @@ jobs:
     name: Build + publish to PyPI
     runs-on: ubuntu-latest
     permissions:
+      # A job-level permissions block REPLACES the workflow-level one (it does not
+      # merge), so contents:read must be restated here or actions/checkout 404s on
+      # its own repo. Both lines are required.
+      contents: read # for actions/checkout
       id-token: write # REQUIRED for Trusted Publishing — this is what replaces the token.
     steps:
       - uses: actions/checkout@v4
