@@ -21,14 +21,31 @@ verifier without a cross-package import.
 
 from __future__ import annotations
 
+import base64
+import binascii
+import copy
 import hashlib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+import base58
 import jcs
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+from .identity import did_from_sk, pubkey_from_did
+
+_ED25519_MULTICODEC = b"\xed\x01"
+# An AgentFacts attestation's lifecycle states (VRP 0.2 §A).
+LIFECYCLE_STATES = ("active", "suspended", "revoked")
 
 SCORING_METHOD = "nanda-rep/0.1"
+# VRP 0.3 §A–C: counterparty-corroborated, collusion-resistant. A receipt counts
+# toward reputation only if a DISTINCT counterparty co-signed it (§A) and it
+# survives collusion severance (§B); see ``cosign_receipt`` / ``is_corroborated``.
+SCORING_METHOD_V2 = "nanda-rep/0.2"
 LEDGER_MEDIA_TYPE = "application/vnd.nanda.receipts-ledger+json"
 
 # nanda-rep/0.1 per-category weights (published as part of the scoring method).
@@ -134,13 +151,16 @@ def build_ledger(
     as_of: str,
     weights: dict[str, float] = DEFAULT_CATEGORY_WEIGHTS,
     inline: bool = True,
+    method: str = SCORING_METHOD,
 ) -> dict[str, Any]:
     """Assemble a ``application/vnd.nanda.receipts-ledger+json`` document.
 
     Self-describing: carries the root + derived scores so a resolver can both
     recompute and detect divergence. ``as_of`` is caller-supplied (this module
-    takes no wall-clock). With ``inline=False`` the
-    receipts are emitted as ``{receipt_id, receipt_hash}`` references.
+    takes no wall-clock). With ``inline=False`` the receipts are emitted as
+    ``{receipt_id, receipt_hash}`` references. ``method`` selects the scoring
+    method: ``nanda-rep/0.1`` (default) or ``nanda-rep/0.2`` (corroborated,
+    collusion-resistant, §C) — the latter also publishes ``corroboration_rate``.
     """
     root = behavioral_merkle_root(receipts)
     if inline:
@@ -153,16 +173,22 @@ def build_ledger(
             }
             for r in receipts
         ]
+    if method == SCORING_METHOD_V2:
+        rep = reputation_score_v2(receipts, is_valid=is_valid, weights=weights)
+    else:
+        rep = reputation_score(receipts, is_valid=is_valid, weights=weights)
     ledger: dict[str, Any] = {
         "subject": subject,
-        "scoring_method": SCORING_METHOD,
+        "scoring_method": method,
         "behavioral_merkle_root": root,
-        "reputation_score": reputation_score(receipts, is_valid=is_valid, weights=weights),
+        "reputation_score": rep,
         "validity_rate": validity_rate(receipts, is_valid=is_valid),
         "receipt_count": len(receipts),
         "as_of": as_of,
         "receipts": receipts_field,
     }
+    if method == SCORING_METHOD_V2:
+        ledger["corroboration_rate"] = corroboration_rate(receipts, is_valid=is_valid)
     return ledger
 
 
@@ -184,6 +210,8 @@ def facet_from_ledger(
         "scoring_method": ledger.get("scoring_method", SCORING_METHOD),
         "as_of": ledger.get("as_of"),
     }
+    if ledger.get("corroboration_rate") is not None:
+        facet["corroboration_rate"] = ledger.get("corroboration_rate")
     if attested_by is not None:
         facet["attested_by"] = attested_by
     return facet
@@ -226,7 +254,11 @@ def verify_ledger(
     if recomputed_root != ledger.get("behavioral_merkle_root"):
         return LedgerVerification(False, "root_mismatch", "recomputed root differs from published")
 
-    recomputed_score = reputation_score(receipts, is_valid=is_valid, weights=weights)
+    method = ledger.get("scoring_method", SCORING_METHOD)
+    if method == SCORING_METHOD_V2:
+        recomputed_score = reputation_score_v2(receipts, is_valid=is_valid, weights=weights)
+    else:
+        recomputed_score = reputation_score(receipts, is_valid=is_valid, weights=weights)
     if abs(recomputed_score - float(ledger.get("reputation_score", 0))) > score_tolerance:
         return LedgerVerification(False, "score_mismatch", "recomputed reputation_score differs")
 
@@ -234,18 +266,415 @@ def verify_ledger(
     if abs(recomputed_validity - float(ledger.get("validity_rate", 0))) > score_tolerance:
         return LedgerVerification(False, "score_mismatch", "recomputed validity_rate differs")
 
+    if method == SCORING_METHOD_V2:
+        recomputed_corr = corroboration_rate(receipts, is_valid=is_valid)
+        if abs(recomputed_corr - float(ledger.get("corroboration_rate", 0))) > score_tolerance:
+            return LedgerVerification(False, "score_mismatch", "recomputed corroboration_rate differs")
+
     return LedgerVerification.accepted()
+
+
+# ── VRP 0.3 §A — counterparty corroboration ──────────────────────────
+#
+# A receipt is *corroborated* iff a DISTINCT counterparty co-signed it: an entry
+# in ``evidence.witness_signatures`` by ``action.counterparty_did`` whose signature
+# verifies over the corroboration payload. This is independent, offline-recomputable
+# evidence — the counterparty's own key attests the interaction. It is the gate
+# ``nanda-rep/0.2`` (SCORING_METHOD_V2) applies before a receipt builds reputation.
+# Pure: no ARP verifier import; "is this receipt valid" stays the caller's ``is_valid``.
+
+
+def did_key_from_pubkey(pubkey: bytes) -> str:
+    """``did:key`` for a 32-byte Ed25519 public key (multicodec ``0xed01`` +
+    base58btc). The pubkey-bytes form of did:key derivation — the inverse of
+    :func:`pubkey_from_did_key`. (``sm_arp.identity.did_from_sk`` derives the same
+    string from a private seed.)"""
+    return "did:key:z" + base58.b58encode(_ED25519_MULTICODEC + pubkey).decode("ascii")
+
+
+def pubkey_from_did_key(did: str) -> bytes:
+    """Inverse of :func:`did_key_from_pubkey`: the 32-byte Ed25519 public key behind
+    a ``did:key:z…``. Raises ``ValueError`` on a non-Ed25519 did:key."""
+    if not did.startswith("did:key:z"):
+        raise ValueError("not a did:key")
+    decoded = base58.b58decode(did[len("did:key:z") :])
+    if decoded[:2] != _ED25519_MULTICODEC:
+        raise ValueError("not an Ed25519 did:key")
+    return decoded[2:]
+
+
+def _corroboration_payload(receipt: dict[str, Any]) -> bytes:
+    """The JCS bytes a counterparty signs: the receipt minus the two mutable
+    signature carriers — top-level ``signature`` and ``evidence.witness_signatures``.
+    An otherwise-empty ``evidence`` is dropped so the bytes are stable, so the
+    counterparty signs *what happened* (action, counterparty, evidence, chain links)
+    without depending on the issuer's signature or any other witness."""
+    r = copy.deepcopy(receipt)
+    r.pop("signature", None)
+    evidence = r.get("evidence")
+    if isinstance(evidence, dict):
+        evidence.pop("witness_signatures", None)
+        if not evidence:
+            r.pop("evidence", None)
+    return bytes(jcs.canonicalize(r))
+
+
+def _counterparty(receipt: dict[str, Any]) -> str | None:
+    """The receipt's counterparty did, iff present and distinct from the issuer
+    (no self-corroboration, VRP 0.3 §A.1)."""
+    cp = (receipt.get("action") or {}).get("counterparty_did")
+    return cp if cp and cp != receipt.get("issuer_did") else None
+
+
+def is_corroborated(receipt: dict[str, Any]) -> bool:
+    """True iff a DISTINCT counterparty co-signed this receipt (VRP 0.3 §A): a
+    ``witness_signatures`` entry by ``counterparty_did`` whose signature verifies
+    over the corroboration payload. Fully recomputable from the receipt + the
+    counterparty's ``did:key`` — the same check any verifier or resolver runs."""
+    cp = _counterparty(receipt)
+    if cp is None:
+        return False
+    witnesses = (receipt.get("evidence") or {}).get("witness_signatures") or []
+    payload = _corroboration_payload(receipt)
+    for entry in witnesses:
+        if not isinstance(entry, dict) or entry.get("witness_did") != cp:
+            continue
+        try:
+            pubkey_from_did(cp).verify(
+                base64.b64decode(str(entry.get("signature", "")), validate=True), payload
+            )
+            return True
+        except (InvalidSignature, ValueError, TypeError, binascii.Error):
+            continue
+    return False
+
+
+def cosign_receipt(
+    receipt: dict[str, Any], *, signing_key_bytes: bytes, witness_did: str | None = None
+) -> dict[str, Any]:
+    """Produce a counterparty co-signature for ``receipt`` (VRP 0.3 §A): the
+    ``{"witness_did", "signature"}`` entry to append to ``evidence.witness_signatures``.
+    The signer SHOULD be the receipt's ``counterparty_did``; ``witness_did`` defaults
+    to the signer's ``did:key``. Deterministic, so the bytes the counterparty signs
+    are byte-identical to what :func:`is_corroborated` verifies — and independent of
+    how the receipt reached the counterparty."""
+    sk = Ed25519PrivateKey.from_private_bytes(signing_key_bytes)
+    did = witness_did or did_from_sk(signing_key_bytes)
+    signature = sk.sign(_corroboration_payload(receipt))
+    return {"witness_did": did, "signature": base64.b64encode(signature).decode("ascii")}
+
+
+# ── VRP 0.3 §B — collusion severance ─────────────────────────────────
+#
+# Corroboration alone is gameable: a set of distinct-but-colluding dids can
+# co-sign each other's receipts. 0.3 voids corroborations from collusion
+# structure. Build the directed corroboration graph (issuer -> counterparty over
+# corroborated, valid receipts), take its strongly-connected components, treat the
+# largest as the honest anchor, and SEVER any other component that is isolated from
+# the anchor (no cross-traffic) AND is either a dense ring (size >= 3, density
+# >= 0.8) or a mutual-only pair. Recomputable offline from the receipts + did:keys.
+
+
+def _corroboration_graph(receipts: Sequence[dict[str, Any]], *, is_valid: IsValid) -> dict[str, dict[str, int]]:
+    """Directed graph over corroborated, ARP-valid receipts: issuer -> counterparty."""
+    graph: dict[str, dict[str, int]] = {}
+    for r in receipts:
+        if not is_valid(r) or not is_corroborated(r):
+            continue
+        a, b = r.get("issuer_did", ""), _counterparty(r) or ""
+        graph.setdefault(a, {})
+        graph.setdefault(b, {})
+        graph[a][b] = graph[a].get(b, 0) + 1
+    return graph
+
+
+def _sccs(graph: dict[str, dict[str, int]]) -> list[list[str]]:
+    """Tarjan strongly-connected components, deterministic; largest first."""
+    index: dict[str, int] = {}
+    low: dict[str, int] = {}
+    stack: list[str] = []
+    on_stack: set[str] = set()
+    comps: list[list[str]] = []
+    counter = [0]
+
+    def connect(v: str) -> None:
+        index[v] = low[v] = counter[0]
+        counter[0] += 1
+        stack.append(v)
+        on_stack.add(v)
+        for w in sorted(graph.get(v, {})):
+            if w not in index:
+                connect(w)
+                low[v] = min(low[v], low[w])
+            elif w in on_stack:
+                low[v] = min(low[v], index[w])
+        if low[v] == index[v]:
+            comp: list[str] = []
+            while True:
+                w = stack.pop()
+                on_stack.discard(w)
+                comp.append(w)
+                if w == v:
+                    break
+            comps.append(sorted(comp))
+
+    for v in sorted(graph):
+        if v not in index:
+            connect(v)
+    return sorted(comps, key=lambda c: (-len(c), c))
+
+
+def _internal_density(graph: dict[str, dict[str, int]], members: set[str]) -> float:
+    if len(members) < 2:
+        return 0.0
+    edges = sum(1 for a in members for b in graph.get(a, {}) if b in members and b != a)
+    possible = len(members) * (len(members) - 1)
+    return edges / possible if possible else 0.0
+
+
+def _cross_edges(graph: dict[str, dict[str, int]], comp: set[str], other: set[str]) -> int:
+    out = sum(1 for a in comp for b in graph.get(a, {}) if b in other)
+    inc = sum(1 for a in other for b in graph.get(a, {}) if b in comp)
+    return out + inc
+
+
+def _severed_dids(graph: dict[str, dict[str, int]]) -> set[str]:
+    """Dids in collusion structure ISOLATED from the honest anchor (VRP 0.3 §B):
+    dense rings (size >= 3, density >= 0.8) AND mutual-only pairs (size 2)."""
+    comps = _sccs(graph)
+    if not comps:
+        return set()
+    anchor = set(comps[0])  # the largest SCC = the honest core
+    severed: set[str] = set()
+    for comp in comps[1:]:
+        members = set(comp)
+        if _cross_edges(graph, members, anchor) > 0:
+            continue  # an honest agent transacted with it — not isolated
+        if len(members) >= 3 and _internal_density(graph, members) >= 0.8:
+            severed |= members
+        elif len(members) == 2:
+            a, b = comp
+            if b in graph.get(a, {}) and a in graph.get(b, {}):  # mutual-only pair
+                severed |= members
+    return severed
+
+
+def _effective_receipts(receipts: Sequence[dict[str, Any]], *, is_valid: IsValid) -> list[dict[str, Any]]:
+    """ARP-valid + corroborated + not touching a severed collusion component."""
+    severed = _severed_dids(_corroboration_graph(receipts, is_valid=is_valid))
+    out: list[dict[str, Any]] = []
+    for r in receipts:
+        if not is_valid(r) or not is_corroborated(r):
+            continue
+        if r.get("issuer_did") in severed or _counterparty(r) in severed:
+            continue
+        out.append(r)
+    return out
+
+
+# ── VRP 0.3 §C — nanda-rep/0.2 scoring ───────────────────────────────
+
+
+def reputation_score_v2(
+    receipts: Sequence[dict[str, Any]],
+    *,
+    is_valid: IsValid,
+    weights: dict[str, float] = DEFAULT_CATEGORY_WEIGHTS,
+) -> float:
+    """``nanda-rep/0.2`` score (VRP 0.3 §C): category weights over GATED receipts —
+    ARP-valid AND corroborated AND not collusion-severed. Uncorroborated/severed
+    receipts earn zero (they still count toward :func:`validity_rate`)."""
+    return sum(
+        weights.get((r.get("action") or {}).get("category", ""), 0.0)
+        for r in _effective_receipts(receipts, is_valid=is_valid)
+    )
+
+
+def corroboration_rate(receipts: Sequence[dict[str, Any]], *, is_valid: IsValid) -> float:
+    """Share of ARP-valid receipts that are corroborated and not severed. 0.0 if none."""
+    valid = [r for r in receipts if is_valid(r)]
+    if not valid:
+        return 0.0
+    return len(_effective_receipts(receipts, is_valid=is_valid)) / len(valid)
+
+
+# ── AgentFacts attestation (VRP 0.2 §A/§B) ───────────────────────────
+#
+# An authority (e.g. a chapter) signs a facts record so a resolver can establish,
+# WITHOUT trusting any host, that this exact standing was vouched for, for this exact
+# identity, over this exact ledger. The signature covers a digest of the whole record
+# (identity + verifiable_receipts facet), so neither can be swapped under it. Verifying
+# the attestation (§B) is separate from recomputing the ledger (``verify_ledger``); the
+# caller decides whether it trusts ``attested_by``.
+
+
+def facts_digest(facts_record: dict[str, Any]) -> str:
+    """``"sha256:<hex>"`` over the facts record with its ``attestation`` member
+    removed (RFC 8785 / JCS). Covers identity + the verifiable_receipts facet in one
+    commitment, so neither can be swapped under the authority's signature."""
+    record = {k: v for k, v in facts_record.items() if k != "attestation"}
+    return "sha256:" + hashlib.sha256(jcs.canonicalize(record)).hexdigest()
+
+
+def _attestation_claim(
+    *,
+    attested_by: str,
+    subject: Any,
+    digest: str,
+    ledger_uri: str | None,
+    root: str | None,
+    lifecycle: str,
+    version: int,
+    as_of: str,
+) -> dict[str, Any]:
+    """The signed claim, sans signature. ``ledger_uri``/``behavioral_merkle_root`` are
+    present iff the record carries a facet."""
+    claim: dict[str, Any] = {
+        "attested_by": attested_by,
+        "subject": subject,
+        "facts_digest": digest,
+        "lifecycle": lifecycle,
+        "revoked": lifecycle == "revoked",
+        "version": version,
+        "as_of": as_of,
+    }
+    if ledger_uri is not None:
+        claim["ledger_uri"] = ledger_uri
+    if root is not None:
+        claim["behavioral_merkle_root"] = root
+    return claim
+
+
+def build_attestation(
+    *,
+    facts_record: dict[str, Any],
+    signing_key_bytes: bytes,
+    as_of: str,
+    version: int = 1,
+    lifecycle: str = "active",
+    attested_by: str | None = None,
+) -> dict[str, Any]:
+    """Sign an AgentFacts Attestation over ``facts_record`` (VRP 0.2 §A).
+
+    The authority's Ed25519 ``signing_key_bytes`` signs the JCS bytes of the claim
+    (sans signature). Returns the attestation object (claim + ``signature``) to attach
+    to the facts record as its ``attestation`` member. ``attested_by`` defaults to the
+    did:key derived from the signing key."""
+    if lifecycle not in LIFECYCLE_STATES:
+        raise ValueError(f"lifecycle must be one of {LIFECYCLE_STATES}")
+    sk = Ed25519PrivateKey.from_private_bytes(signing_key_bytes)
+    pubkey = sk.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    facet = facts_record.get("verifiable_receipts") or {}
+    claim = _attestation_claim(
+        attested_by=attested_by or did_key_from_pubkey(pubkey),
+        subject=facts_record.get("id"),
+        digest=facts_digest(facts_record),
+        ledger_uri=facet.get("ledger_uri"),
+        root=facet.get("behavioral_merkle_root"),
+        lifecycle=lifecycle,
+        version=version,
+        as_of=as_of,
+    )
+    signature = sk.sign(jcs.canonicalize(claim))
+    return {**claim, "signature": base64.b64encode(signature).decode("ascii")}
+
+
+@dataclass
+class AttestationVerification:
+    ok: bool
+    # accepted | no_claim | attestation_missing | attestation_invalid |
+    # facts_digest_mismatch | subject_mismatch | facet_binding_mismatch |
+    # revoked | stale_attestation
+    stage: str
+    detail: str
+
+    @classmethod
+    def accepted(cls) -> AttestationVerification:
+        return cls(True, "accepted", "attestation binds this standing to this identity")
+
+
+def verify_attestation(
+    facts_record: dict[str, Any],
+    *,
+    min_version: int | None = None,
+) -> AttestationVerification:
+    """Verify the AgentFacts Attestation on ``facts_record`` (VRP 0.2 §B steps 1-7).
+
+    Establishes that the standing was vouched for, by ``attested_by``, for this exact
+    agent identity, over this exact ledger — without trusting any host. Does NOT fetch
+    or recompute the ledger itself (that is :func:`verify_ledger`, §B step 8). The
+    caller decides whether it trusts ``attested_by``."""
+    facet = facts_record.get("verifiable_receipts")
+    att = facts_record.get("attestation")
+
+    # §B.1 — a facet that asserts standing must carry an attestation.
+    if att is None:
+        if facet is None:
+            return AttestationVerification(True, "no_claim", "record asserts no standing")
+        return AttestationVerification(False, "attestation_missing", "facet without attestation")
+
+    # §B.2 — signature over the claim (sans signature) under attested_by.
+    claim = {k: v for k, v in att.items() if k != "signature"}
+    try:
+        pubkey = pubkey_from_did_key(str(att.get("attested_by", "")))
+        Ed25519PublicKey.from_public_bytes(pubkey).verify(
+            base64.b64decode(str(att.get("signature", "")), validate=True),
+            jcs.canonicalize(claim),
+        )
+    except (InvalidSignature, ValueError, TypeError, binascii.Error):
+        return AttestationVerification(False, "attestation_invalid", "signature does not verify")
+
+    # revoked/lifecycle internal consistency (both are inside the signed claim).
+    if bool(claim.get("revoked")) != (claim.get("lifecycle") == "revoked"):
+        return AttestationVerification(False, "attestation_invalid", "revoked/lifecycle inconsistent")
+
+    # §B.3 — facts digest still matches the record (metadata not altered post-sign).
+    if claim.get("facts_digest") != facts_digest(facts_record):
+        return AttestationVerification(False, "facts_digest_mismatch", "facts record altered after signing")
+
+    # §B.4 — subject is this record's identity.
+    if claim.get("subject") != facts_record.get("id"):
+        return AttestationVerification(False, "subject_mismatch", "claim subject != record id")
+
+    # §B.5 — the claim's ledger pointer + root match the published facet.
+    if facet is not None and (
+        claim.get("ledger_uri") != facet.get("ledger_uri")
+        or claim.get("behavioral_merkle_root") != facet.get("behavioral_merkle_root")
+    ):
+        return AttestationVerification(False, "facet_binding_mismatch", "claim facet != published facet")
+
+    # §B.6 — lifecycle gate.
+    if claim.get("lifecycle") == "revoked":
+        return AttestationVerification(False, "revoked", "subject is revoked")
+
+    # §B.7 — freshness / monotonic version (caller supplies the floor it has seen).
+    if min_version is not None and int(claim.get("version", 0)) < min_version:
+        return AttestationVerification(False, "stale_attestation", "version below the floor seen for subject")
+
+    return AttestationVerification.accepted()
 
 
 __all__ = [
     "DEFAULT_CATEGORY_WEIGHTS",
     "LEDGER_MEDIA_TYPE",
+    "LIFECYCLE_STATES",
     "SCORING_METHOD",
+    "SCORING_METHOD_V2",
+    "AttestationVerification",
     "LedgerVerification",
     "behavioral_merkle_root",
+    "build_attestation",
     "build_ledger",
+    "corroboration_rate",
+    "cosign_receipt",
+    "did_key_from_pubkey",
     "facet_from_ledger",
+    "facts_digest",
+    "is_corroborated",
+    "pubkey_from_did_key",
     "reputation_score",
+    "reputation_score_v2",
     "validity_rate",
+    "verify_attestation",
     "verify_ledger",
 ]

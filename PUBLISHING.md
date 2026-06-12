@@ -34,8 +34,7 @@ git push origin v0.2.0
 
 The `release` workflow builds the sdist + wheel, runs `twine check`, and uploads
 to PyPI over OIDC. Watch it under the repo's **Actions** tab. Within a minute,
-`pip install sm-arp` works for everyone — and downstream repos (sm-chapter,
-sm-member-sdk) can drop their vendored copy and depend on the published package.
+`pip install sm-arp` works for everyone.
 
 ## Notes
 

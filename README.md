@@ -31,9 +31,7 @@ IssuerLog("log.sqlite").append(r)           # SQLite Issuer/Agency Log, hash-cha
 
 `sm_arp`'s verifier is tested against the canonical 22-vector corpus and asserted
 byte-for-byte equal to the conformance harness's verdict on every vector — so the
-library and the spec cannot disagree. [`sm-chapter`](https://github.com/Sharathvc23/sm-chapter)
-(Issuer Log) and [`sm-member-sdk`](https://github.com/Sharathvc23/sm-member-sdk)
-(Agency Log) both consume it.
+library and the spec cannot disagree.
 
 ## Layout
 
@@ -65,10 +63,9 @@ first consumer.
    [`sm-conformance`](https://github.com/Sharathvc23/sm-conformance) and ship it
    at your runtime's `.nanda/conformance.json` — and, if you serve it over HTTP,
    at the canonical `/.well-known/conformance.json` (see sm-conformance SPEC §3.2).
-4. Submit your runtime to the conformance registry at
-   `labs.stellarminds.ai/conformance` for independent re-verification — lab
-   re-run, counter-signature, or attested CI (a self-signed badge alone is not
-   sufficient).
+
+The badge is self-signed and independently re-verifiable: anyone can recompute
+`pytest conformance/` against the bundled vectors and check the signature offline.
 
 ## Implementing ARP
 
