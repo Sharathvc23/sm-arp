@@ -1,5 +1,23 @@
 # Changelog — sm-arp
 
+## 0.2.1 — wheel ships only the library (no namespace pollution)
+
+The published wheel now contains **only** the `sm_arp` library. Previously it also
+shipped top-level `conformance` and `arp_cli` packages — a top-level `conformance`
+collided with downstream consumers' own `conformance` modules, and because the wheel
+didn't include the JSON schema files, the shadowing copy broke schema loading.
+
+- `[tool.setuptools.packages.find] include = ["sm_arp*"]` (was `sm_arp*` + `conformance*`
+  + `arp_cli*`).
+- Removed the `arp` console-script entry point: the CLI (`arp_cli`) depends on the
+  conformance harness and is now a repo/dev tool — run it from a checkout via
+  `python -m arp_cli.cli`. The conformance harness, vectors, and schemas likewise stay
+  in the repo (for `pytest conformance/`), just not in the wheel. `pip install -e .` for
+  development still exposes all of it.
+
+No library API change — `import sm_arp` / `sm_arp.vrp` is unchanged and now installs with
+no extra top-level packages.
+
 ## 0.2.0 — VRP 0.3 counterparty-corroborated, collusion-resistant reputation
 
 Brings `sm_arp.vrp` from VRP 0.1 to VRP 0.3 (`nanda-rep/0.2`): counterparty

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sm-arp"
-version = "0.2.0"
+version = "0.2.1"
 description = "Agency Receipt Protocol — receipt envelope spec + language-agnostic conformance harness. Points at sm-conformance for the signed badge."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -38,7 +38,9 @@ conformance = [
     "referencing>=0.30",
     "sm-conformance>=0.3.1",
 ]
-# Command-line tool — `pip install sm-arp[cli]` exposes the `arp` entry point.
+# Command-line tool (`arp_cli`) — a repo/dev tool, run from a checkout via
+# `python -m arp_cli.cli`. Not shipped in the wheel (it depends on the conformance
+# harness, which the wheel intentionally excludes).
 cli = [
     "typer>=0.12",
 ]
@@ -48,16 +50,18 @@ dev = [
     "ruff>=0.6",
 ]
 
-[project.scripts]
-arp = "arp_cli.cli:main"
-
 [project.urls]
 Homepage = "https://labs.stellarminds.ai/arp"
 Repository = "https://github.com/Sharathvc23/sm-arp"
 
+# The published wheel ships ONLY the consumable library (`sm_arp`). The conformance
+# harness (`conformance/`), CLI (`arp_cli/`), schemas, and vectors are repo/dev tools —
+# shipping them as top-level `conformance` / `arp_cli` packages polluted consumers'
+# namespaces (a top-level `conformance` shadowed downstreams' own). `pip install -e .`
+# for development still exposes everything; only the built wheel is scoped down.
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["sm_arp*", "conformance*", "arp_cli*"]
+include = ["sm_arp*"]
 
 [tool.pytest.ini_options]
 testpaths = ["sm_arp", "conformance", "tests"]
