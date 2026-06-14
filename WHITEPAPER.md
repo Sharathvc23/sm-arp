@@ -8,7 +8,7 @@
 
 The Agency Receipt Protocol (ARP) is a per-action accountability primitive for autonomous AI agents acting on behalf of humans: a signed, human-readable record that an agent took a specific action, for a specific principal, under a specific authority, with a chain of evidence behind it. Each receipt is verifiable by anyone holding the issuing agent's public key, readable in a single sentence by the human it represents, and linkable to the grant of authority the action was taken under. ARP is runtime-agnostic — an agent built on Claude, OpenAI, LangGraph, or a custom stack emits the same receipt — and sits *above* the tool-integration and transport protocols (MCP, A2A) as the human-facing layer those deliberately do not provide.
 
-This whitepaper makes the case that the *receipt* — the portable, human-facing record of an agent's action — is a primitive in its own right, separable from the runtimes that produce it and from the substrate evidence that engines emit. The receipt envelope, signing, evidence model, and authority chain are documented in [`SPEC.md`](spec/arp/0.1/spec.md) as a working draft. This document covers motivation, design choices, and composition.
+This whitepaper makes the case that the *receipt* — the portable, human-facing record of an agent's action — is a primitive in its own right, separable from the runtimes that produce it and from the substrate evidence that engines emit. A single receipt proves one action; the *aggregate* of an agent's receipts is the substrate for portable, counterparty-corroborated **reputation** (§8) — a standing any party recomputes and verifies offline. The receipt envelope, signing, evidence model, and authority chain are documented in [`SPEC.md`](spec/arp/0.1/spec.md) as a working draft. This document covers motivation, design choices, composition, and the reputation profile built on the receipt.
 
 ---
 
@@ -111,27 +111,43 @@ ARP is the **human-facing accountability layer above the tool and transport prot
 |---|---|---|
 | an agent runtime (any stack) | a signed ARP receipt of one action | the represented human's diary, a regulator, an insurer, a downstream agent |
 | ARP receipts (chained) | a defensible account of delegated agency | audit and dispute resolution |
+| a corpus of corroborated receipts | a recomputable `nanda-rep` score + `behavioral_merkle_root` (§8) | a registry's admission gate, an insurer, or a downstream agent deciding whom to trust |
 | `sm-arp` conformance suite | receipt vectors + criteria | `sm-conformance`, which produces the runtime's badge |
 | `sm-conformance` | a signed conformance badge | a registry admitting the ARP runtime |
 
 A common deployment: an agent acts through MCP/A2A, emits an ARP receipt of the outcome, and ships a `sm-conformance` badge proving its ARP implementation is conformant. The human holds the receipts; a registry holds the badge.
 
-## 8. NANDA Alignment
+## 8. Verifiable Reputation: From Receipts to Standing
+
+A single receipt proves one action. The *aggregate* of an agent's receipts is something more valuable: the substrate for a portable, verifiable **reputation**. The Verifiable Receipts Profile (shipped as the `sm_arp.vrp` module) turns a receipt log into a standing any party can **recompute and verify offline**, with no trust in the agent's host.
+
+**Commitment.** `behavioral_merkle_root` commits to an agent's receipts in order. A published score is bound to a specific receipt set — substitute or reorder the log and the root changes.
+
+**Self-attested score (`nanda-rep/0.1`).** A category-weighted score over the agent's own valid receipts (`reputation_score`). It is honest about its weakness: an agent can inflate it by emitting receipts to itself, so 0.1 is a *baseline*, not a trust signal.
+
+**Corroborated, collusion-resistant score (`nanda-rep/0.2`).** The load-bearing one. A receipt counts toward reputation only if the **counterparty co-signs it** (`cosign_receipt` → `evidence.witness_signatures`; `is_corroborated`). Uncorroborated receipts earn zero — standing cannot be manufactured by acting alone. On top of corroboration, the profile runs **collusion severance**: it builds the corroboration graph, finds dense mutually-co-signing rings (strongly-connected components weighted by internal density), and severs them, so a clique trading co-signs cannot farm reputation. `corroboration_rate` reports how much of a log is corroborated; `reputation_score_v2` is the gated, severed score.
+
+**Attestation.** A credentialed authority (a registry or hosting community the resolver already trusts) signs the agent's published standing — binding identity, the ledger reference, and the behavioral root (`build_attestation` / `verify_attestation`, over `facts_digest`). A resolver can then rely on the standing **without trusting the agent's live server**: it verifies the signature, recomputes the score from the receipts, and confirms it matches.
+
+The property that makes this *verifiable* reputation rather than asserted reputation: the score is a **pure function of the receipts**. A registry's admission gate, an insurer, or a downstream agent each recomputes it independently and gets the byte-identical value. Reputation becomes portable — it travels with the agent across communities — corroborated rather than self-claimed, collusion-resistant, and offline-verifiable. That is the difference between "this agent says it is reputable" and "anyone can check."
+
+## 9. NANDA Alignment
 
 [Project NANDA](https://projectnanda.org) defines four pillars the open Internet of Agents must solve: **DNS** (discovery), **CA** (decentralized identity), **Orchestration** (routing), and **Attestation** (verifiable evidence). ARP contributes verifiable, per-action, human-facing evidence of what agents do under delegated authority — complementing NANDA's per-*credential* primitives (AgentFacts describes what an agent *is*; KYA attests *who vouches* for it; an ARP receipt records what it *did* for a human).
 
 > **Relationship to AAE — complementary.** The Attested Action Envelope (AAE), rendered by the operator surfaces, is also a per-action signed envelope. ARP and AAE are **complementary, not competing**: ARP is the *human-facing* receipt (one-sentence summary, authority chain, forward hash chain), AAE the *substrate* evidence record (four envelope kinds, bidirectional merkle-checkpoint audit). They compose through a defined seam — an ARP receipt's `evidence` references the AAE envelope(s) that substantiate the action, and an AAE `checkpoint` may cover ARP receipts, so ARP relies on AAE for reverse-audit anchoring rather than growing its own merkle layer. Neither is redundant: each owns what the other deliberately omits. The normative seam is `spec.md` §16.
 
-## 9. Future Work
+## 10. Future Work
 
 Items deferred from v0.1, in rough priority order:
 
 1. **The Delegated Authority Token (DAT) companion**, promoted from sketch (`dat-companion.md`) to a normative spec the authority chain references.
 2. **Richer action categories.** Sub-payload shapes for specific action classes (purchase, transfer, agreement), kept additive to the base receipt.
-3. **Resolving the ARP ↔ AAE relationship** (§8) — convergence, complement, or clean separation — ahead of v1.0.
-4. **Published-spec governance** via `labs.stellarminds.ai/arp`, with the conformance registry operated alongside.
+3. **A normative reputation profile.** The model in §8 ships as the `sm_arp.vrp` library; promote it to a published profile spec alongside the receipt spec, with its own conformance vectors.
+4. **Resolving the ARP ↔ AAE relationship** (§9) — convergence, complement, or clean separation — ahead of v1.0.
+5. **Published-spec governance** via `labs.stellarminds.ai/arp`, with the conformance registry operated alongside.
 
-## 10. Related Packages
+## 11. Related Packages
 
 | Package | Role |
 |---|---|
@@ -141,6 +157,6 @@ Items deferred from v0.1, in rough priority order:
 
 ---
 
-*First published: 2026-05-31 | Last modified: 2026-05-31*
+*First published: 2026-05-31 | Last modified: 2026-06-14*
 
 *Personal research contributions aligned with [Project NANDA](https://projectnanda.org) standards. [Stellarminds.ai](https://stellarminds.ai)*
