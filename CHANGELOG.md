@@ -1,5 +1,14 @@
 # Changelog — sm-arp
 
+## Unreleased — docs
+
+- WHITEPAPER: add §8 "Verifiable Reputation: From Receipts to Standing", covering
+  the `sm_arp.vrp` reputation profile (commitment, self-attested `nanda-rep/0.1`,
+  counterparty-corroborated + collusion-resistant `nanda-rep/0.2`, attestation)
+  that shipped in 0.2.0 but was undocumented in the whitepaper. Abstract and the
+  composition table updated to reference it; "normative reputation profile" added
+  to Future Work.
+
 ## 0.2.1 — wheel ships only the library (no namespace pollution)
 
 The published wheel now contains **only** the `sm_arp` library. Previously it also
