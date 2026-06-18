@@ -11,6 +11,7 @@ do not address.
 
 - **[WHITEPAPER.md](./WHITEPAPER.md)** — motivation, design choices, and how ARP fits the portfolio.
 - **[spec/arp/0.1/spec.md](./spec/arp/0.1/spec.md)** — the canonical normative document (RFC-style).
+- **[THREATMODEL.md](./THREATMODEL.md)** — what a receipt does and does not prove, threats A1–A10, the delegation/transparency trust-rung roadmap, and a verifier checklist.
 
 ## Use it as a library
 
