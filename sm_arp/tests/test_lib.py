@@ -112,12 +112,14 @@ def test_authority_chain_scope():
     )
     grants = {grant["receipt_id"]: grant}
     ok = issue_receipt(
-        agent, principal_did=principal,
+        agent,
+        principal_did=principal,
         action=_action(category="data_shared", granted_by_receipt_id=grant["receipt_id"]),
     )
     assert verify_receipt(ok, grants=grants).ok
     out_of_scope = issue_receipt(
-        agent, principal_did=principal,
+        agent,
+        principal_did=principal,
         action=_action(category="purchase", granted_by_receipt_id=grant["receipt_id"]),
     )
     assert verify_receipt(out_of_scope, grants=grants).stage == "authority_chain"
@@ -167,7 +169,9 @@ def test_category_enumerations_agree():
     )
 
 
-@pytest.mark.parametrize("category", ["commitment_entered", "commitment_fulfilled", "commitment_breached"])
+@pytest.mark.parametrize(
+    "category", ["commitment_entered", "commitment_fulfilled", "commitment_breached"]
+)
 def test_commitment_receipt_verifies_and_scores(category):
     """A commitment receipt must pass STRICT verification (it is a valid v0.1
     category) and be a known category to the reputation scorer. Before the fix a
@@ -196,7 +200,9 @@ def test_verify_matches_vector_corpus(path):
     v = _load(path)
     expect_pass = v["expected_outcome"] == "verify_pass"
     res = _verify_vector(v, _chain_priors())
-    assert res.ok is expect_pass, f"{v['id']}: expected ok={expect_pass}, got {res.stage}: {res.detail}"
+    assert res.ok is expect_pass, (
+        f"{v['id']}: expected ok={expect_pass}, got {res.stage}: {res.detail}"
+    )
 
 
 def test_corpus_is_present():
@@ -213,8 +219,13 @@ def test_verify_agrees_with_conformance(path):
     from conformance.arp import verify_receipt as conf_verify
 
     v = _load(path)
-    priors = {chain_link(_load(p)["receipt"]): _load(p)["receipt"]
-              for p in _VECTOR_PATHS if _load(p)["expected_outcome"] == "verify_pass"}
+    priors = {
+        chain_link(_load(p)["receipt"]): _load(p)["receipt"]
+        for p in _VECTOR_PATHS
+        if _load(p)["expected_outcome"] == "verify_pass"
+    }
     conf = conf_verify(v["receipt"], mode=v.get("verifier_mode", "strict"), prior_receipts=priors)
     lib = _verify_vector(v, _chain_priors())
-    assert lib.ok == conf.ok, f"{v['id']}: lib ok={lib.ok} ({lib.stage}) but conformance ok={conf.ok}"
+    assert lib.ok == conf.ok, (
+        f"{v['id']}: lib ok={lib.ok} ({lib.stage}) but conformance ok={conf.ok}"
+    )

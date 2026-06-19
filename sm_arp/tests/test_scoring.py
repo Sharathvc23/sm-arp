@@ -91,7 +91,10 @@ def test_ledger_v2_roundtrip() -> None:
     a, b, c = bytes([1]) * 32, bytes([2]) * 32, bytes([3]) * 32
     rs = [_corroborated(a, b, "r1"), _uncorroborated(a, c, "r2")]
     ledger = build_ledger(
-        subject=did_from_sk(a), receipts=rs, is_valid=_TRUE, as_of="2026-01-01T00:00:00Z",
+        subject=did_from_sk(a),
+        receipts=rs,
+        is_valid=_TRUE,
+        as_of="2026-01-01T00:00:00Z",
         method="nanda-rep/0.2",
     )
     assert ledger["scoring_method"] == "nanda-rep/0.2"

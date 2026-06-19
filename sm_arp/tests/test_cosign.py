@@ -101,13 +101,19 @@ def test_third_party_witness_does_not_corroborate() -> None:
 def test_garbage_signature_not_corroborated() -> None:
     a, b = gen_key(), gen_key()
     r = _receipt(did_from_sk(a), did_from_sk(b))
-    r["evidence"] = {"witness_signatures": [{"witness_did": did_from_sk(b), "signature": "not-base64!!"}]}
+    r["evidence"] = {
+        "witness_signatures": [{"witness_did": did_from_sk(b), "signature": "not-base64!!"}]
+    }
     assert is_corroborated(r) is False
 
 
 def test_did_key_helpers_roundtrip_and_agree_with_identity() -> None:
     seed = gen_key()
-    pub = Ed25519PrivateKey.from_private_bytes(seed).public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    pub = (
+        Ed25519PrivateKey.from_private_bytes(seed)
+        .public_key()
+        .public_bytes(Encoding.Raw, PublicFormat.Raw)
+    )
     did = did_key_from_pubkey(pub)
     assert did == did_from_sk(seed)  # pubkey-form agrees with the seed-form deriver
     assert pubkey_from_did_key(did) == pub  # exact inverse

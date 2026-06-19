@@ -76,7 +76,9 @@ def verify(
     receipts: list[dict] = body if isinstance(body, list) else [body]
 
     typer.echo()
-    typer.echo(f"verifying {file}  (mode={mode}, {len(receipts)} receipt{'s' if len(receipts) != 1 else ''})")
+    typer.echo(
+        f"verifying {file}  (mode={mode}, {len(receipts)} receipt{'s' if len(receipts) != 1 else ''})"
+    )
     typer.echo()
 
     # Build a priors map from the trace itself so hash-chain links can resolve.
@@ -117,37 +119,45 @@ def inspect(
     and the action's machine_payload at a glance.
     """
     body = _load(file)
-    receipt = body["receipt"] if isinstance(body, dict) and "receipt" in body and "version" not in body else body
+    receipt = (
+        body["receipt"]
+        if isinstance(body, dict) and "receipt" in body and "version" not in body
+        else body
+    )
 
     if not isinstance(receipt, dict):
-        typer.secho("error: inspect operates on a single receipt, not a trace.", fg=typer.colors.RED, err=True)
+        typer.secho(
+            "error: inspect operates on a single receipt, not a trace.",
+            fg=typer.colors.RED,
+            err=True,
+        )
         raise typer.Exit(code=2)
 
     narrate.section("Receipt")
-    narrate.kv("version",    receipt.get("version", "?"))
+    narrate.kv("version", receipt.get("version", "?"))
     narrate.kv("receipt_id", receipt.get("receipt_id", "?"))
-    narrate.kv("issued_at",  receipt.get("issued_at", "?"))
-    narrate.kv("issuer",     receipt.get("issuer_did", "?"))
-    narrate.kv("principal",  receipt.get("principal_did", "?"))
+    narrate.kv("issued_at", receipt.get("issued_at", "?"))
+    narrate.kv("issuer", receipt.get("issuer_did", "?"))
+    narrate.kv("principal", receipt.get("principal_did", "?"))
 
     action = receipt.get("action", {})
     narrate.section("Action")
-    narrate.kv("category",   action.get("category", "?"))
-    narrate.kv("outcome",    action.get("outcome", "?"))
-    narrate.kv("summary",    action.get("human_summary", "?"))
+    narrate.kv("category", action.get("category", "?"))
+    narrate.kv("outcome", action.get("outcome", "?"))
+    narrate.kv("summary", action.get("human_summary", "?"))
     if "counterparty_label" in action:
         narrate.kv("counterparty", action["counterparty_label"])
     if "counterparty_did" in action:
-        narrate.kv("cp_did",   action["counterparty_did"])
+        narrate.kv("cp_did", action["counterparty_did"])
     if "amount" in action:
         amt = action["amount"]
-        narrate.kv("amount",   f"{amt.get('cents', 0)/100:.2f} {amt.get('currency', '')}")
+        narrate.kv("amount", f"{amt.get('cents', 0) / 100:.2f} {amt.get('currency', '')}")
     if "granted_by_receipt_id" in action:
         narrate.kv("granted_by", action["granted_by_receipt_id"])
     if "reversal_of_receipt_id" in action:
-        narrate.kv("reverses",  action["reversal_of_receipt_id"])
+        narrate.kv("reverses", action["reversal_of_receipt_id"])
     if "machine_payload" in action:
-        narrate.kv("payload",   json.dumps(action["machine_payload"], ensure_ascii=False))
+        narrate.kv("payload", json.dumps(action["machine_payload"], ensure_ascii=False))
 
     if "authority_chain" in receipt:
         narrate.section("Authority chain (top-level)")
@@ -166,7 +176,7 @@ def inspect(
     if "accessibility" in receipt:
         narrate.section("Accessibility")
         acc = receipt["accessibility"]
-        narrate.kv("language",  acc.get("summary_language", "—"))
+        narrate.kv("language", acc.get("summary_language", "—"))
         if "alt_summaries" in acc:
             narrate.kv("alt_langs", ", ".join(s["lang"] for s in acc["alt_summaries"]))
         if "complexity_level" in acc:
@@ -178,13 +188,13 @@ def inspect(
         narrate.section("Evidence")
         ev = receipt["evidence"]
         if "external_refs" in ev:
-            narrate.kv("refs",      ", ".join(ev["external_refs"]))
+            narrate.kv("refs", ", ".join(ev["external_refs"]))
         if "prompt_lineage_hash" in ev:
-            narrate.kv("prompt_h",  ev["prompt_lineage_hash"])
+            narrate.kv("prompt_h", ev["prompt_lineage_hash"])
         if "decision_trace_hash" in ev:
             narrate.kv("decision_h", ev["decision_trace_hash"])
         if "tool_invocations" in ev:
-            narrate.kv("tools",     f"{len(ev['tool_invocations'])} invocation(s)")
+            narrate.kv("tools", f"{len(ev['tool_invocations'])} invocation(s)")
         if "witness_signatures" in ev:
             narrate.kv("witnesses", f"{len(ev['witness_signatures'])} co-signer(s)")
 
@@ -261,7 +271,11 @@ def _walk_authority_edge(child: dict, parent: dict) -> Optional[str]:
 @app.command(name="walk-authority")
 def walk_authority(
     file: Path = typer.Argument(..., help="Path to a trace JSON file (array of receipts)."),
-    start: Optional[str] = typer.Option(None, "--start", help="Receipt id to start the walk from. Defaults to the last receipt in the file."),
+    start: Optional[str] = typer.Option(
+        None,
+        "--start",
+        help="Receipt id to start the walk from. Defaults to the last receipt in the file.",
+    ),
 ) -> None:
     """Walk action.granted_by_receipt_id back to the root grant.
 
@@ -270,7 +284,11 @@ def walk_authority(
     """
     body = _load(file)
     if not isinstance(body, list):
-        typer.secho("error: walk-authority requires a trace (array of receipts).", fg=typer.colors.RED, err=True)
+        typer.secho(
+            "error: walk-authority requires a trace (array of receipts).",
+            fg=typer.colors.RED,
+            err=True,
+        )
         raise typer.Exit(code=2)
 
     by_id = {r["receipt_id"]: r for r in body}
@@ -320,7 +338,11 @@ def walk_authority(
 @app.command(name="walk-chain")
 def walk_chain(
     file: Path = typer.Argument(..., help="Path to a receipt that declares previous_receipt_hash."),
-    back_to: Path = typer.Option(..., "--back-to", help="Path to the prior receipt (we recompute its canonical hash and compare)."),
+    back_to: Path = typer.Option(
+        ...,
+        "--back-to",
+        help="Path to the prior receipt (we recompute its canonical hash and compare).",
+    ),
 ) -> None:
     """Verify a previous_receipt_hash link between two receipts.
 
@@ -337,12 +359,14 @@ def walk_chain(
 
     declared = cur.get("previous_receipt_hash")
     if not declared:
-        typer.secho("error: current receipt has no previous_receipt_hash.", fg=typer.colors.RED, err=True)
+        typer.secho(
+            "error: current receipt has no previous_receipt_hash.", fg=typer.colors.RED, err=True
+        )
         raise typer.Exit(code=2)
 
     recomputed = compute_chain_link(prev)
     narrate.section("Hash chain link")
-    narrate.kv("declared",   declared)
+    narrate.kv("declared", declared)
     narrate.kv("recomputed", recomputed)
 
     if declared == recomputed:
@@ -381,7 +405,9 @@ def vectors_list(
 
 @vectors_app.command("run")
 def vectors_run(
-    vector_id: str = typer.Argument(..., help="Vector id (e.g. '01-basic-purchase'). See `arp vectors list`."),
+    vector_id: str = typer.Argument(
+        ..., help="Vector id (e.g. '01-basic-purchase'). See `arp vectors list`."
+    ),
 ) -> None:
     """Load a golden vector, verify it, and explain whether the outcome matches expectations."""
     try:
@@ -396,8 +422,8 @@ def vectors_run(
 
     narrate.section(f"Vector {meta.vector_id}")
     narrate.kv("description", meta.description)
-    narrate.kv("expected",    f"{expected} (mode={mode})")
-    narrate.kv("spec_ref",    body.get("spec_ref", "—"))
+    narrate.kv("expected", f"{expected} (mode={mode})")
+    narrate.kv("spec_ref", body.get("spec_ref", "—"))
     typer.echo()
 
     ok_flag, stage, detail = _verify_one(receipt, mode, priors=corpus.chain_priors())
@@ -439,17 +465,23 @@ def _demo_step(idx: int, total: int, vector_id: str, blurb: str) -> bool:
     mode = meta.verifier_mode
 
     title = (
-        "A single receipt" if vector_id == "01-basic-purchase"
-        else "Tampering is detected" if vector_id == "16-invalid-signature"
-        else "Tamper-evident hash chain over time" if vector_id == "12-chain-linked"
-        else "Regulatory-grade evidence" if vector_id == "04-data-shared-gdpr"
-        else "MCP tool integration" if vector_id == "15-with-tool-invocations"
-        else "Forward compatibility" if vector_id == "22-unknown-category-tolerant"
+        "A single receipt"
+        if vector_id == "01-basic-purchase"
+        else "Tampering is detected"
+        if vector_id == "16-invalid-signature"
+        else "Tamper-evident hash chain over time"
+        if vector_id == "12-chain-linked"
+        else "Regulatory-grade evidence"
+        if vector_id == "04-data-shared-gdpr"
+        else "MCP tool integration"
+        if vector_id == "15-with-tool-invocations"
+        else "Forward compatibility"
+        if vector_id == "22-unknown-category-tolerant"
         else meta.vector_id
     )
     narrate.step_header(idx, total, title)
-    narrate.kv("vector",  meta.vector_id)
-    narrate.kv("blurb",   blurb)
+    narrate.kv("vector", meta.vector_id)
+    narrate.kv("blurb", blurb)
     typer.echo()
 
     ok_flag, stage, detail = _verify_one(receipt, mode, priors=corpus.chain_priors())
@@ -471,25 +503,28 @@ def _demo_key_facts(receipt: dict) -> None:
     action = receipt.get("action", {})
     cat = action.get("category", "?")
     narrate.kv("category", cat)
-    narrate.kv("summary",  action.get("human_summary", "?"))
+    narrate.kv("summary", action.get("human_summary", "?"))
 
     if "previous_receipt_hash" in receipt:
         narrate.kv("prev_hash", receipt["previous_receipt_hash"])
 
     if cat == "data_shared" and "jurisdiction" in receipt:
         j = receipt["jurisdiction"]
-        narrate.kv("jurisdiction", f"residence={j.get('principal_residence', '?')}, regimes={j.get('applicable_regimes', [])}")
+        narrate.kv(
+            "jurisdiction",
+            f"residence={j.get('principal_residence', '?')}, regimes={j.get('applicable_regimes', [])}",
+        )
         acc = receipt.get("accessibility", {})
         if "alt_summaries" in acc:
             langs = ", ".join(s["lang"] for s in acc["alt_summaries"])
             narrate.kv("alt_langs", langs)
         if acc.get("requires_review"):
-            narrate.kv("flag",     "requires_review=true (sensitive)")
+            narrate.kv("flag", "requires_review=true (sensitive)")
 
     if "tool_invocations" in receipt.get("evidence", {}):
         ti = receipt["evidence"]["tool_invocations"]
-        narrate.kv("tools",     f"{len(ti)} MCP invocation(s) — req+resp hashed")
-        narrate.kv("mcp_uri",   ti[0].get("mcp_server_uri", "—"))
+        narrate.kv("tools", f"{len(ti)} MCP invocation(s) — req+resp hashed")
+        narrate.kv("mcp_uri", ti[0].get("mcp_server_uri", "—"))
 
     if cat == "other":
         mp = action.get("machine_payload", {})
@@ -499,12 +534,14 @@ def _demo_key_facts(receipt: dict) -> None:
 def _demo_step_nanda(idx: int, total: int, blurb: str) -> bool:
     """Run the NANDA causal trace step — walks the authority chain and reports."""
     narrate.step_header(idx, total, "Cross-principal authority graph")
-    narrate.kv("trace",  str(corpus.NANDA_TRACE.relative_to(corpus.REPO_ROOT)))
-    narrate.kv("blurb",  blurb)
+    narrate.kv("trace", str(corpus.NANDA_TRACE.relative_to(corpus.REPO_ROOT)))
+    narrate.kv("blurb", blurb)
     typer.echo()
 
     if not corpus.NANDA_TRACE.is_file():
-        narrate.fail("nanda_interaction_trace.json missing — run `python nanda/nanda_trace_demo.py` first")
+        narrate.fail(
+            "nanda_interaction_trace.json missing — run `python nanda/nanda_trace_demo.py` first"
+        )
         return False
 
     trace = json.loads(corpus.NANDA_TRACE.read_text())
@@ -544,7 +581,9 @@ def _demo_step_nanda(idx: int, total: int, blurb: str) -> bool:
 def demo() -> None:
     """The 5-step ARP tour. Reads only — no keys, no network. Idempotent."""
     narrate.banner("ARP v0.1 demo — the format in five steps")
-    narrate.note(f"corpus: {corpus.VECTORS_DIR.relative_to(corpus.REPO_ROOT)} ({len(corpus.list_vectors())} vectors)")
+    narrate.note(
+        f"corpus: {corpus.VECTORS_DIR.relative_to(corpus.REPO_ROOT)} ({len(corpus.list_vectors())} vectors)"
+    )
     narrate.note(f"trace:  {corpus.NANDA_TRACE.relative_to(corpus.REPO_ROOT)} (if present)")
 
     total = len(corpus.DEMO_SPINE)
@@ -557,9 +596,7 @@ def demo() -> None:
     if failures:
         narrate.closing(f"{failures} of {total} steps failed — see output above")
         raise typer.Exit(code=1)
-    narrate.closing(
-        "ARP receipts give humans portable, signed, machine-verifiable proof of"
-    )
+    narrate.closing("ARP receipts give humans portable, signed, machine-verifiable proof of")
     typer.secho(
         "  what their agents did — and under what authority.",
         bold=True,
@@ -614,7 +651,10 @@ def keygen(
         help="Use a specific 32-byte ASCII seed (demo only). Default: cryptographically random.",
     ),
     out: Optional[Path] = typer.Option(
-        None, "--out", "-o", help="Write base64(seed) to this file (mode 0600). If omitted, prints seed to stdout."
+        None,
+        "--out",
+        "-o",
+        help="Write base64(seed) to this file (mode 0600). If omitted, prints seed to stdout.",
     ),
 ) -> None:
     """Generate an Ed25519 keypair and emit its did:key.
@@ -625,9 +665,7 @@ def keygen(
     With --out, writes the seed to a file with mode 0600 and prints
     only the did:key to stdout.
     """
-    seed_bytes = (
-        _issue.parse_seed(seed) if seed else _issue.random_seed()
-    )
+    seed_bytes = _issue.parse_seed(seed) if seed else _issue.random_seed()
     did = _issue.did_key_for_seed(seed_bytes)
     seed_b64 = base64.b64encode(seed_bytes).decode("ascii")
 
@@ -651,21 +689,55 @@ def keygen(
 
 @app.command()
 def issue(
-    category: str = typer.Argument(..., help="Action category — see `arp vectors list` for valid values."),
-    issuer_key: str = typer.Option(..., "--issuer-key", help="Ed25519 seed: 32-byte ASCII, base64:..., or @path/to/file."),
-    principal: str = typer.Option(..., "--principal", help="Principal did:key (the human on whose behalf the agent is acting)."),
-    summary: str = typer.Option(..., "--summary", "-s", help="One-sentence human_summary (≤ 280 chars)."),
-    outcome: str = typer.Option("completed", "--outcome", help="One of: completed, failed, partial, reversed, pending."),
-    counterparty: Optional[str] = typer.Option(None, "--counterparty", help="Counterparty did:key."),
-    counterparty_label: Optional[str] = typer.Option(None, "--counterparty-label", help="Human-readable counterparty name."),
-    amount_cents: Optional[int] = typer.Option(None, "--amount", help="Amount in cents (negative = outgoing)."),
-    currency: str = typer.Option("USD", "--currency", help="ISO 4217 currency (used only if --amount given)."),
-    granted_by: Optional[str] = typer.Option(None, "--granted-by", help="receipt_id of the authority_granted receipt that authorizes this action."),
-    reverses: Optional[str] = typer.Option(None, "--reverses", help="receipt_id of the receipt this one reverses (issuer must match)."),
-    payload: Optional[str] = typer.Option(None, "--payload", help="JSON object for action.machine_payload."),
-    receipt_id: Optional[str] = typer.Option(None, "--id", help="Override the receipt_id (default: random UUIDv4)."),
-    issued_at: Optional[str] = typer.Option(None, "--issued-at", help="Override issued_at (default: now, UTC second precision)."),
-    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Write the receipt to this file (default: stdout)."),
+    category: str = typer.Argument(
+        ..., help="Action category — see `arp vectors list` for valid values."
+    ),
+    issuer_key: str = typer.Option(
+        ..., "--issuer-key", help="Ed25519 seed: 32-byte ASCII, base64:..., or @path/to/file."
+    ),
+    principal: str = typer.Option(
+        ...,
+        "--principal",
+        help="Principal did:key (the human on whose behalf the agent is acting).",
+    ),
+    summary: str = typer.Option(
+        ..., "--summary", "-s", help="One-sentence human_summary (≤ 280 chars)."
+    ),
+    outcome: str = typer.Option(
+        "completed", "--outcome", help="One of: completed, failed, partial, reversed, pending."
+    ),
+    counterparty: Optional[str] = typer.Option(
+        None, "--counterparty", help="Counterparty did:key."
+    ),
+    counterparty_label: Optional[str] = typer.Option(
+        None, "--counterparty-label", help="Human-readable counterparty name."
+    ),
+    amount_cents: Optional[int] = typer.Option(
+        None, "--amount", help="Amount in cents (negative = outgoing)."
+    ),
+    currency: str = typer.Option(
+        "USD", "--currency", help="ISO 4217 currency (used only if --amount given)."
+    ),
+    granted_by: Optional[str] = typer.Option(
+        None,
+        "--granted-by",
+        help="receipt_id of the authority_granted receipt that authorizes this action.",
+    ),
+    reverses: Optional[str] = typer.Option(
+        None, "--reverses", help="receipt_id of the receipt this one reverses (issuer must match)."
+    ),
+    payload: Optional[str] = typer.Option(
+        None, "--payload", help="JSON object for action.machine_payload."
+    ),
+    receipt_id: Optional[str] = typer.Option(
+        None, "--id", help="Override the receipt_id (default: random UUIDv4)."
+    ),
+    issued_at: Optional[str] = typer.Option(
+        None, "--issued-at", help="Override issued_at (default: now, UTC second precision)."
+    ),
+    out: Optional[Path] = typer.Option(
+        None, "--out", "-o", help="Write the receipt to this file (default: stdout)."
+    ),
 ) -> None:
     """Issue a fresh signed ARP receipt.
 
@@ -707,13 +779,33 @@ def issue(
 
 @app.command()
 def grant(
-    issuer_key: str = typer.Option(..., "--issuer-key", help="Ed25519 seed of the issuer (principal or sub-delegating agent)."),
-    principal: str = typer.Option(..., "--principal", help="Principal did:key — the human at the root of the chain. Per spec §4.5 step 2, MUST be the same for every grant in a chain."),
+    issuer_key: str = typer.Option(
+        ..., "--issuer-key", help="Ed25519 seed of the issuer (principal or sub-delegating agent)."
+    ),
+    principal: str = typer.Option(
+        ...,
+        "--principal",
+        help="Principal did:key — the human at the root of the chain. Per spec §4.5 step 2, MUST be the same for every grant in a chain.",
+    ),
     to: str = typer.Option(..., "--to", help="did:key of the agent receiving the authority."),
-    scope: str = typer.Option(..., "--scope", help="Comma-separated action categories (or '*' for any). Example: 'data_shared,message_sent'."),
-    expires: str = typer.Option(..., "--expires", help="grant_expires_at — RFC 3339 UTC second-precision (e.g. 2026-12-31T23:59:59Z)."),
-    summary: Optional[str] = typer.Option(None, "--summary", "-s", help="Override the auto-generated human_summary."),
-    granted_by: Optional[str] = typer.Option(None, "--granted-by", help="receipt_id of the parent grant (set for sub-delegation; omit for genesis grants)."),
+    scope: str = typer.Option(
+        ...,
+        "--scope",
+        help="Comma-separated action categories (or '*' for any). Example: 'data_shared,message_sent'.",
+    ),
+    expires: str = typer.Option(
+        ...,
+        "--expires",
+        help="grant_expires_at — RFC 3339 UTC second-precision (e.g. 2026-12-31T23:59:59Z).",
+    ),
+    summary: Optional[str] = typer.Option(
+        None, "--summary", "-s", help="Override the auto-generated human_summary."
+    ),
+    granted_by: Optional[str] = typer.Option(
+        None,
+        "--granted-by",
+        help="receipt_id of the parent grant (set for sub-delegation; omit for genesis grants).",
+    ),
     receipt_id: Optional[str] = typer.Option(None, "--id", help="Override the receipt_id."),
     issued_at: Optional[str] = typer.Option(None, "--issued-at", help="Override issued_at."),
     out: Optional[Path] = typer.Option(None, "--out", "-o", help="Write the receipt to this file."),
@@ -727,7 +819,9 @@ def grant(
     issuer_did = _issue.did_key_for_seed(seed)
     scope_list = [s.strip() for s in scope.split(",") if s.strip()]
     if not scope_list:
-        typer.secho("error: --scope must contain at least one category", fg=typer.colors.RED, err=True)
+        typer.secho(
+            "error: --scope must contain at least one category", fg=typer.colors.RED, err=True
+        )
         raise typer.Exit(code=2)
 
     auto_summary = (
@@ -765,10 +859,20 @@ def grant(
 
 @app.command()
 def revoke(
-    issuer_key: str = typer.Option(..., "--issuer-key", help="Ed25519 seed of the principal who originally issued the grant."),
-    principal: str = typer.Option(..., "--principal", help="Principal did:key — must equal the original grant's principal_did."),
-    revokes: str = typer.Option(..., "--revokes", help="receipt_id of the authority_granted receipt being revoked."),
-    summary: Optional[str] = typer.Option(None, "--summary", "-s", help="Override the auto-generated human_summary."),
+    issuer_key: str = typer.Option(
+        ..., "--issuer-key", help="Ed25519 seed of the principal who originally issued the grant."
+    ),
+    principal: str = typer.Option(
+        ...,
+        "--principal",
+        help="Principal did:key — must equal the original grant's principal_did.",
+    ),
+    revokes: str = typer.Option(
+        ..., "--revokes", help="receipt_id of the authority_granted receipt being revoked."
+    ),
+    summary: Optional[str] = typer.Option(
+        None, "--summary", "-s", help="Override the auto-generated human_summary."
+    ),
     receipt_id: Optional[str] = typer.Option(None, "--id", help="Override the receipt_id."),
     issued_at: Optional[str] = typer.Option(None, "--issued-at", help="Override issued_at."),
     out: Optional[Path] = typer.Option(None, "--out", "-o", help="Write the receipt to this file."),

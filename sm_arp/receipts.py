@@ -144,7 +144,15 @@ class VerifyResult:
         return cls(True, "accepted", "receipt verifies")
 
 
-_REQUIRED_TOP = ("version", "receipt_id", "issuer_did", "principal_did", "issued_at", "action", "signature")
+_REQUIRED_TOP = (
+    "version",
+    "receipt_id",
+    "issuer_did",
+    "principal_did",
+    "issued_at",
+    "action",
+    "signature",
+)
 
 
 def _check_structure(r: dict[str, Any], *, strict: bool) -> VerifyResult | None:
@@ -204,7 +212,9 @@ def verify_authority_chain(r: dict[str, Any], grants: dict[str, dict[str, Any]])
     scope = mp.get("granted_scope", [])
     cat = r["action"]["category"]
     if cat not in scope and "*" not in scope:
-        return VerifyResult(False, "authority_chain", f"category {cat!r} outside grant scope {scope}")
+        return VerifyResult(
+            False, "authority_chain", f"category {cat!r} outside grant scope {scope}"
+        )
     if mp.get("granted_to_did") not in (None, r["issuer_did"]):
         return VerifyResult(False, "authority_chain", "issuer is not the grantee")
     return VerifyResult.accepted()
@@ -215,10 +225,14 @@ def verify_hash_chain(r: dict[str, Any], prior: dict[str, Any] | None) -> Verify
     declared = r.get("previous_receipt_hash")
     if prior is None:
         if declared:
-            return VerifyResult(False, "hash_chain", "genesis receipt declares a previous_receipt_hash")
+            return VerifyResult(
+                False, "hash_chain", "genesis receipt declares a previous_receipt_hash"
+            )
         return VerifyResult.accepted()
     if not declared:
-        return VerifyResult(False, "hash_chain", "missing previous_receipt_hash on a non-genesis receipt")
+        return VerifyResult(
+            False, "hash_chain", "missing previous_receipt_hash on a non-genesis receipt"
+        )
     if declared != chain_link(prior):
         return VerifyResult(False, "hash_chain", "previous_receipt_hash does not match predecessor")
     return VerifyResult.accepted()

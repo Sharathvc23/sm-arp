@@ -28,26 +28,26 @@ _RESET = "\033[0m"
 
 _OUTCOME_GLYPH = {
     "completed": "✓",
-    "failed":    "✗",
-    "partial":   "◐",
-    "reversed":  "↺",
-    "pending":   "⋯",
+    "failed": "✗",
+    "partial": "◐",
+    "reversed": "↺",
+    "pending": "⋯",
 }
 
 _CATEGORY_VERB = {
-    "purchase":            "bought",
-    "payment_sent":        "sent payment",
-    "payment_received":    "received payment",
-    "message_sent":        "sent a message",
-    "message_received":    "received a message",
-    "decision_made":       "made a decision",
-    "data_shared":         "shared data",
-    "appointment_booked":  "booked an appointment",
+    "purchase": "bought",
+    "payment_sent": "sent payment",
+    "payment_received": "received payment",
+    "message_sent": "sent a message",
+    "message_received": "received a message",
+    "decision_made": "made a decision",
+    "data_shared": "shared data",
+    "appointment_booked": "booked an appointment",
     "appointment_cancelled": "cancelled an appointment",
-    "record_filed":        "filed a record",
-    "vote_cast":           "cast a vote",
-    "authority_granted":   "granted authority",
-    "authority_revoked":   "revoked authority",
+    "record_filed": "filed a record",
+    "vote_cast": "cast a vote",
+    "authority_granted": "granted authority",
+    "authority_revoked": "revoked authority",
 }
 
 
@@ -61,14 +61,20 @@ def _format_timestamp(iso: str) -> str:
     except ValueError:
         return iso
     # Use platform-independent day-of-month (no leading zero)
-    return dt.strftime("%a %b ") + str(dt.day) + ", " + dt.strftime("%Y — ") + dt.strftime("%I:%M %p UTC").lstrip("0")
+    return (
+        dt.strftime("%a %b ")
+        + str(dt.day)
+        + ", "
+        + dt.strftime("%Y — ")
+        + dt.strftime("%I:%M %p UTC").lstrip("0")
+    )
 
 
 def _format_amount(amount: dict) -> str:
     cents = amount.get("cents", 0)
     currency = amount.get("currency", "")
     sign = "-" if cents < 0 else "+"
-    return f"{sign}{currency} {abs(cents)/100:,.2f}"
+    return f"{sign}{currency} {abs(cents) / 100:,.2f}"
 
 
 def _format_jurisdiction(j: dict) -> str:
@@ -87,7 +93,7 @@ def _format_jurisdiction(j: dict) -> str:
 def _short_did(did: str) -> str:
     """Truncate a did:key for the (rare) cases we have to surface one."""
     if did.startswith("did:key:z"):
-        body = did[len("did:key:z"):]
+        body = did[len("did:key:z") :]
         return f"did:key:z{body[:8]}…"
     return did[:20] + "…"
 
@@ -144,7 +150,11 @@ def _verify_status(
     if result.stage == "schema":
         return ("MALFORMED", _RED, f"schema: {result.detail}")
     if result.stage == "hash_chain":
-        return ("CHAIN UNVERIFIED", _YELLOW, "previous_receipt_hash claim cannot be resolved without the prior receipt")
+        return (
+            "CHAIN UNVERIFIED",
+            _YELLOW,
+            "previous_receipt_hash claim cannot be resolved without the prior receipt",
+        )
     return ("UNVERIFIED", _YELLOW, f"{result.stage}: {result.detail}")
 
 
@@ -188,7 +198,9 @@ def render_receipt(
         # would imply success, contradicting the status pill above.
         lines.append(f"{indent}  {_RED}?{_RESET} {_summary(receipt, lang=lang)}")
         lines.append(f"{indent}    {_RED}⚠ {status_detail}{_RESET}")
-        lines.append(f"{indent}    {_RED}Body shown for reference; do not rely on these contents.{_RESET}")
+        lines.append(
+            f"{indent}    {_RED}Body shown for reference; do not rely on these contents.{_RESET}"
+        )
     else:
         lines.append(f"{indent}  {glyph} {_summary(receipt, lang=lang)}")
         if status_label != "VERIFIED":
@@ -211,7 +223,12 @@ def render_receipt(
     principal = receipt.get("principal_did", "")
     if issuer and principal and issuer != principal:
         lines.append(f"{inner}taken by an agent on your behalf")
-    elif issuer and principal and issuer == principal and action.get("category") in {"authority_granted", "authority_revoked"}:
+    elif (
+        issuer
+        and principal
+        and issuer == principal
+        and action.get("category") in {"authority_granted", "authority_revoked"}
+    ):
         lines.append(f"{inner}taken by you (the principal)")
 
     if show_crypto:
@@ -264,7 +281,9 @@ def render_trace(
             parent_summary = _summary(parent, lang=lang)
             if len(parent_summary) > 70:
                 parent_summary = parent_summary[:67] + "…"
-            block += f'\n      ↳ under authority granted at {parent_when}:\n         "{parent_summary}"'
+            block += (
+                f'\n      ↳ under authority granted at {parent_when}:\n         "{parent_summary}"'
+            )
 
         prev_hash = r.get("previous_receipt_hash")
         if prev_hash and prev_hash in by_chain_link:

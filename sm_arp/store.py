@@ -38,7 +38,9 @@ class ReceiptLog:
                 )
                 """
             )
-            c.execute("CREATE INDEX IF NOT EXISTS idx_principal ON receipts(principal_did, issued_at)")
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_principal ON receipts(principal_did, issued_at)"
+            )
             c.execute("CREATE INDEX IF NOT EXISTS idx_issuer ON receipts(issuer_did, issued_at)")
 
     def _conn(self) -> sqlite3.Connection:

@@ -48,7 +48,9 @@ def test_empty_has_no_root() -> None:
 
 def test_single_leaf_is_leaf_hash() -> None:
     r = _r(1)
-    assert behavioral_merkle_root([r]) == "sha256:" + hashlib.sha256(jcs.canonicalize(r)).hexdigest()
+    assert (
+        behavioral_merkle_root([r]) == "sha256:" + hashlib.sha256(jcs.canonicalize(r)).hexdigest()
+    )
 
 
 def test_order_independent() -> None:
@@ -80,27 +82,35 @@ def test_weighted_score() -> None:
 
 
 def test_weights_cover_categories() -> None:
-    assert {"purchase", "message_sent", "authority_granted", "other"} <= set(DEFAULT_CATEGORY_WEIGHTS)
+    assert {"purchase", "message_sent", "authority_granted", "other"} <= set(
+        DEFAULT_CATEGORY_WEIGHTS
+    )
 
 
 # ── Receipts Ledger ──
 def test_build_then_verify() -> None:
     rs = [_r(i, "purchase") for i in range(3)]
-    ledger = build_ledger(subject=SUBJECT, receipts=rs, is_valid=_always, as_of="2026-06-07T00:00:00Z")
+    ledger = build_ledger(
+        subject=SUBJECT, receipts=rs, is_valid=_always, as_of="2026-06-07T00:00:00Z"
+    )
     assert ledger["receipt_count"] == 3 and ledger["reputation_score"] == 15.0
     assert verify_ledger(ledger, is_valid=_always).ok
 
 
 def test_verify_detects_tamper() -> None:
     rs = [_r(i) for i in range(3)]
-    ledger = build_ledger(subject=SUBJECT, receipts=rs, is_valid=_always, as_of="2026-06-07T00:00:00Z")
+    ledger = build_ledger(
+        subject=SUBJECT, receipts=rs, is_valid=_always, as_of="2026-06-07T00:00:00Z"
+    )
     ledger["receipts"][1]["action"]["human_summary"] = "x"
     assert verify_ledger(ledger, is_valid=_always).stage == "root_mismatch"
 
 
 def test_verify_detects_count_inflation() -> None:
     rs = [_r(i) for i in range(3)]
-    ledger = build_ledger(subject=SUBJECT, receipts=rs, is_valid=_always, as_of="2026-06-07T00:00:00Z")
+    ledger = build_ledger(
+        subject=SUBJECT, receipts=rs, is_valid=_always, as_of="2026-06-07T00:00:00Z"
+    )
     ledger["receipt_count"] = 99
     assert verify_ledger(ledger, is_valid=_always).stage == "count_mismatch"
 
@@ -109,14 +119,23 @@ def test_validity_over_real_arp_verifier() -> None:
     sk = Identity.from_seed(hashlib.sha256(b"vrp-real").digest())
     from sm_arp import verify_receipt
 
-    good = [issue_receipt(sk, principal_did=sk.did, action=build_action(category="purchase", human_summary="g")) for _ in range(2)]
-    bad = issue_receipt(sk, principal_did=sk.did, action=build_action(category="purchase", human_summary="b"))
+    good = [
+        issue_receipt(
+            sk, principal_did=sk.did, action=build_action(category="purchase", human_summary="g")
+        )
+        for _ in range(2)
+    ]
+    bad = issue_receipt(
+        sk, principal_did=sk.did, action=build_action(category="purchase", human_summary="b")
+    )
     bad["action"]["human_summary"] = "tampered"
     rs = [*good, bad]
     assert abs(validity_rate(rs, is_valid=lambda r: verify_receipt(r).ok) - (2 / 3)) < 1e-9
 
 
 def test_facet_is_contents_free() -> None:
-    ledger = build_ledger(subject=SUBJECT, receipts=[_r(0)], is_valid=_always, as_of="2026-06-07T00:00:00Z")
+    ledger = build_ledger(
+        subject=SUBJECT, receipts=[_r(0)], is_valid=_always, as_of="2026-06-07T00:00:00Z"
+    )
     facet = facet_from_ledger(ledger, ledger_uri="https://x")
     assert "receipts" not in facet and facet["scoring_method"] == "nanda-rep/0.1"

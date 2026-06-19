@@ -269,7 +269,9 @@ def verify_ledger(
     if method == SCORING_METHOD_V2:
         recomputed_corr = corroboration_rate(receipts, is_valid=is_valid)
         if abs(recomputed_corr - float(ledger.get("corroboration_rate", 0))) > score_tolerance:
-            return LedgerVerification(False, "score_mismatch", "recomputed corroboration_rate differs")
+            return LedgerVerification(
+                False, "score_mismatch", "recomputed corroboration_rate differs"
+            )
 
     return LedgerVerification.accepted()
 
@@ -375,7 +377,9 @@ def cosign_receipt(
 # >= 0.8) or a mutual-only pair. Recomputable offline from the receipts + did:keys.
 
 
-def _corroboration_graph(receipts: Sequence[dict[str, Any]], *, is_valid: IsValid) -> dict[str, dict[str, int]]:
+def _corroboration_graph(
+    receipts: Sequence[dict[str, Any]], *, is_valid: IsValid
+) -> dict[str, dict[str, int]]:
     """Directed graph over corroborated, ARP-valid receipts: issuer -> counterparty."""
     graph: dict[str, dict[str, int]] = {}
     for r in receipts:
@@ -459,7 +463,9 @@ def _severed_dids(graph: dict[str, dict[str, int]]) -> set[str]:
     return severed
 
 
-def _effective_receipts(receipts: Sequence[dict[str, Any]], *, is_valid: IsValid) -> list[dict[str, Any]]:
+def _effective_receipts(
+    receipts: Sequence[dict[str, Any]], *, is_valid: IsValid
+) -> list[dict[str, Any]]:
     """ARP-valid + corroborated + not touching a severed collusion component."""
     severed = _severed_dids(_corroboration_graph(receipts, is_valid=is_valid))
     out: list[dict[str, Any]] = []
@@ -626,11 +632,15 @@ def verify_attestation(
 
     # revoked/lifecycle internal consistency (both are inside the signed claim).
     if bool(claim.get("revoked")) != (claim.get("lifecycle") == "revoked"):
-        return AttestationVerification(False, "attestation_invalid", "revoked/lifecycle inconsistent")
+        return AttestationVerification(
+            False, "attestation_invalid", "revoked/lifecycle inconsistent"
+        )
 
     # §B.3 — facts digest still matches the record (metadata not altered post-sign).
     if claim.get("facts_digest") != facts_digest(facts_record):
-        return AttestationVerification(False, "facts_digest_mismatch", "facts record altered after signing")
+        return AttestationVerification(
+            False, "facts_digest_mismatch", "facts record altered after signing"
+        )
 
     # §B.4 — subject is this record's identity.
     if claim.get("subject") != facts_record.get("id"):
@@ -641,7 +651,9 @@ def verify_attestation(
         claim.get("ledger_uri") != facet.get("ledger_uri")
         or claim.get("behavioral_merkle_root") != facet.get("behavioral_merkle_root")
     ):
-        return AttestationVerification(False, "facet_binding_mismatch", "claim facet != published facet")
+        return AttestationVerification(
+            False, "facet_binding_mismatch", "claim facet != published facet"
+        )
 
     # §B.6 — lifecycle gate.
     if claim.get("lifecycle") == "revoked":
@@ -649,7 +661,9 @@ def verify_attestation(
 
     # §B.7 — freshness / monotonic version (caller supplies the floor it has seen).
     if min_version is not None and int(claim.get("version", 0)) < min_version:
-        return AttestationVerification(False, "stale_attestation", "version below the floor seen for subject")
+        return AttestationVerification(
+            False, "stale_attestation", "version below the floor seen for subject"
+        )
 
     return AttestationVerification.accepted()
 

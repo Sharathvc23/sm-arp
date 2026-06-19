@@ -58,7 +58,7 @@ def parse_seed(spec: str) -> bytes:
         )
 
     if spec.startswith("base64:"):
-        decoded = base64.b64decode(spec[len("base64:"):], validate=True)
+        decoded = base64.b64decode(spec[len("base64:") :], validate=True)
         if len(decoded) != 32:
             raise ValueError(f"base64 seed decodes to {len(decoded)} bytes, expected 32")
         return decoded
@@ -115,12 +115,8 @@ def seed_is_well_known(seed: bytes) -> bool:
 # ── receipts ───────────────────────────────────────────────────────
 
 
-_UUID_V4_RE = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-)
-_RFC3339_UTC_RE = re.compile(
-    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
-)
+_UUID_V4_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+_RFC3339_UTC_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 
 
 def new_receipt_id() -> str:

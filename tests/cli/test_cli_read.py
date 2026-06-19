@@ -45,6 +45,7 @@ def test_verify_rejects_wrong_version(runner, vectors_dir):
 def test_verify_resolves_hash_chain_in_array(runner, vectors_dir, tmp_path):
     # Build a 2-receipt array (vector 11 genesis + 12 linked) so the chain link resolves.
     import json
+
     v11 = json.loads((vectors_dir / "11-chain-genesis.json").read_text())["receipt"]
     v12 = json.loads((vectors_dir / "12-chain-linked.json").read_text())["receipt"]
     trace_path = tmp_path / "chain.json"
@@ -174,6 +175,7 @@ def test_render_trace_surfaces_authority_links(runner, nanda_trace):
 
 def test_render_trace_surfaces_hash_chain_links(runner, vectors_dir, tmp_path):
     import json
+
     v11 = json.loads((vectors_dir / "11-chain-genesis.json").read_text())["receipt"]
     v12 = json.loads((vectors_dir / "12-chain-linked.json").read_text())["receipt"]
     trace_path = tmp_path / "chain.json"
@@ -206,6 +208,7 @@ def test_render_lang_prefix_match(runner, vectors_dir):
 
 def test_render_show_crypto_exposes_dids(runner, nanda_trace, tmp_path):
     import json
+
     r3 = json.loads(nanda_trace.read_text())[-1]
     p = tmp_path / "r3.json"
     p.write_text(json.dumps(r3))

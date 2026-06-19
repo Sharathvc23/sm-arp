@@ -38,7 +38,7 @@ class VectorMeta:
     vector_id: str
     description: str
     expected_outcome: str  # verify_pass | schema_fail | signature_fail | hash_chain_fail
-    verifier_mode: str     # strict | tolerant
+    verifier_mode: str  # strict | tolerant
     path: Path
 
     def load(self) -> dict:
