@@ -99,7 +99,7 @@ The following categories are defined in v0.1. Categories are case-sensitive lowe
 | `record_filed` | Filed something with a third party (tax authority, government, HOA, court). | High-stakes; jurisdiction §8 **SHOULD** be present. |
 | `account_created` / `account_closed` | Identity binding to a service began or ended. | |
 | `attestation_issued` / `attestation_received` | Trust-graph operation. | |
-| `commitment_entered` / `commitment_fulfilled` / `commitment_breached` | See companion commitment spec (deferred to v0.2). | |
+| `commitment_entered` / `commitment_fulfilled` / `commitment_breached` | A commitment was entered into, fulfilled, or breached. Valid v0.1 categories; the detailed per-category `machine_payload` schema (the companion commitment spec) is deferred to v0.2. | |
 | `vote_cast` | Voted in any formal poll, governance, or DAO action. | |
 | `authority_granted` | Principal granted an agent explicit authority for a scope of action categories with an expiration. See §4.6. | `machine_payload` MUST contain `granted_scope` (non-empty array), `granted_to_did`, `grant_expires_at`. |
 | `authority_revoked` | Principal revoked a previously-granted authority. | `machine_payload` MUST contain `revokes_receipt_id` pointing to the original grant. |
