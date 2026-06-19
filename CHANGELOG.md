@@ -1,6 +1,22 @@
 # Changelog — sm-arp
 
-## Unreleased — docs
+## 0.2.2 — commitment_* category consistency
+
+The `commitment_entered` / `commitment_fulfilled` / `commitment_breached` action
+categories were present in the normative JSON schema (`schema/arp/0.1/action.schema.json`),
+weighted in `DEFAULT_CATEGORY_WEIGHTS`, and listed in spec §4.3 — but were missing from
+`KNOWN_CATEGORIES` in `sm_arp/receipts.py`, so the strict library verifier rejected a
+commitment receipt that the scorer was built to reward. The four sources now agree.
+
+- `receipts.py`: add the three `commitment_*` categories to `KNOWN_CATEGORIES` (19 → 22),
+  so commitment receipts strict-verify.
+- spec §4.3: clarify the categories are valid in v0.1; only the detailed per-category
+  `machine_payload` schema (the companion commitment spec) is deferred to v0.2.
+- tests: `test_category_enumerations_agree` (drift guard pinning schema enum ==
+  `KNOWN_CATEGORIES` == `DEFAULT_CATEGORY_WEIGHTS`) and
+  `test_commitment_receipt_verifies_and_scores`.
+
+### Docs
 
 - WHITEPAPER: add §8 "Verifiable Reputation: From Receipts to Standing", covering
   the `sm_arp.vrp` reputation profile (commitment, self-attested `nanda-rep/0.1`,

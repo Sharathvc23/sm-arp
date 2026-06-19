@@ -34,7 +34,8 @@ KNOWN_CATEGORIES = {
     "message_received", "decision_made", "data_shared", "appointment_booked",
     "appointment_cancelled", "subscription_changed", "record_filed",
     "account_created", "account_closed", "attestation_issued",
-    "attestation_received", "vote_cast", "authority_granted",
+    "attestation_received", "commitment_entered", "commitment_fulfilled",
+    "commitment_breached", "vote_cast", "authority_granted",
     "authority_revoked", "other",
 }  # fmt: skip
 OUTCOMES = {"completed", "failed", "partial", "reversed", "pending"}
