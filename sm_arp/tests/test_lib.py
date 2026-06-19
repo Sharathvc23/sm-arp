@@ -137,6 +137,57 @@ def test_store_round_trip_and_idempotent(tmp_path):
     assert log.get(r["receipt_id"])["signature"] == r["signature"]
 
 
+def _schema_categories() -> set[str]:
+    """The category enum from the normative JSON schema — the source of truth the
+    conformance harness gates strict verification on."""
+    schema = _load(_VECTORS_DIR.parents[2] / "schema" / "arp" / "0.1" / "action.schema.json")
+    return set(schema["properties"]["category"]["enum"])
+
+
+def test_category_enumerations_agree():
+    """The three category enumerations MUST be the same set: the normative schema
+    enum, the lib's strict KNOWN_CATEGORIES, and vrp's DEFAULT_CATEGORY_WEIGHTS.
+
+    This is the invariant the commitment_* drift violated (KNOWN_CATEGORIES had
+    dropped commitment_entered/fulfilled/breached while the schema and the scorer
+    still carried them). Locking all three together permanently prevents the next
+    silent divergence between what a receipt can declare, what verifies, and what
+    the reputation scorer rewards."""
+    from sm_arp.receipts import KNOWN_CATEGORIES
+    from sm_arp.vrp import DEFAULT_CATEGORY_WEIGHTS
+
+    schema_cats = _schema_categories()
+    assert set(KNOWN_CATEGORIES) == schema_cats, (
+        f"KNOWN_CATEGORIES drift: only-in-schema={schema_cats - set(KNOWN_CATEGORIES)}, "
+        f"only-in-known={set(KNOWN_CATEGORIES) - schema_cats}"
+    )
+    assert set(DEFAULT_CATEGORY_WEIGHTS) == schema_cats, (
+        f"weights drift: only-in-schema={schema_cats - set(DEFAULT_CATEGORY_WEIGHTS)}, "
+        f"only-in-weights={set(DEFAULT_CATEGORY_WEIGHTS) - schema_cats}"
+    )
+
+
+@pytest.mark.parametrize("category", ["commitment_entered", "commitment_fulfilled", "commitment_breached"])
+def test_commitment_receipt_verifies_and_scores(category):
+    """A commitment receipt must pass STRICT verification (it is a valid v0.1
+    category) and be a known category to the reputation scorer. Before the fix a
+    strict verifier rejected it at the structure stage while the scorer weighted
+    it — a receipt that scored could not verify."""
+    from sm_arp.receipts import KNOWN_CATEGORIES
+    from sm_arp.vrp import DEFAULT_CATEGORY_WEIGHTS, reputation_score
+
+    me = Identity.generate()
+    r = issue_receipt(me, principal_did=me.did, action=_action(category=category))
+    res = verify_receipt(r, mode="strict")
+    assert res.ok, f"strict verify rejected {category}: {res.stage}: {res.detail}"
+
+    assert category in KNOWN_CATEGORIES
+    assert category in DEFAULT_CATEGORY_WEIGHTS
+    # The scorer must see the same weight the published table declares for it.
+    score = reputation_score([r], is_valid=lambda _: True)
+    assert score == DEFAULT_CATEGORY_WEIGHTS[category]
+
+
 @pytest.mark.parametrize("path", _VECTOR_PATHS, ids=lambda p: p.stem)
 def test_verify_matches_vector_corpus(path):
     """The lib's verifier must reproduce each canonical vector's documented
