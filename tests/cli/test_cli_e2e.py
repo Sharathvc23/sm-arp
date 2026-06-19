@@ -7,13 +7,11 @@ a regression net.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from arp_cli.cli import app
 from tests.cli.conftest import did_for_seed, parse_receipt_id, strip_ansi
 
-
-E2E_HUMAN   = "tests-cli-e2e-human-seed-32-bts!"
+E2E_HUMAN = "tests-cli-e2e-human-seed-32-bts!"
 E2E_AGENT_A = "tests-cli-e2e-agent-a-seed-32bt!"
 E2E_AGENT_B = "tests-cli-e2e-agent-b-seed-32bt!"
 
@@ -27,40 +25,75 @@ def test_full_delegation_chain_builds_verifies_and_walks(runner, tmp_path):
     # Receipt 1 — Human grants Agent A. scope includes authority_granted so A
     # is permitted to sub-delegate.
     r1 = tmp_path / "r1.json"
-    grant1 = runner.invoke(app, [
-        "grant",
-        "--issuer-key", E2E_HUMAN, "--principal", h, "--to", a,
-        "--scope", "data_shared,message_sent,authority_granted",
-        "--expires", "2026-12-31T23:59:59Z",
-        "--out", str(r1),
-    ])
+    grant1 = runner.invoke(
+        app,
+        [
+            "grant",
+            "--issuer-key",
+            E2E_HUMAN,
+            "--principal",
+            h,
+            "--to",
+            a,
+            "--scope",
+            "data_shared,message_sent,authority_granted",
+            "--expires",
+            "2026-12-31T23:59:59Z",
+            "--out",
+            str(r1),
+        ],
+    )
     assert grant1.exit_code == 0, grant1.output
     r1_id = parse_receipt_id(r1)
 
     # Receipt 2 — Agent A sub-delegates to Agent B; principal stays the human.
     r2 = tmp_path / "r2.json"
-    grant2 = runner.invoke(app, [
-        "grant",
-        "--issuer-key", E2E_AGENT_A, "--principal", h, "--to", b,
-        "--scope", "data_shared",
-        "--expires", "2026-12-31T23:59:59Z",
-        "--granted-by", r1_id,
-        "--out", str(r2),
-    ])
+    grant2 = runner.invoke(
+        app,
+        [
+            "grant",
+            "--issuer-key",
+            E2E_AGENT_A,
+            "--principal",
+            h,
+            "--to",
+            b,
+            "--scope",
+            "data_shared",
+            "--expires",
+            "2026-12-31T23:59:59Z",
+            "--granted-by",
+            r1_id,
+            "--out",
+            str(r2),
+        ],
+    )
     assert grant2.exit_code == 0, grant2.output
     r2_id = parse_receipt_id(r2)
 
     # Receipt 3 — Agent B does the data_shared action under the sub-delegation.
     r3 = tmp_path / "r3.json"
-    action = runner.invoke(app, [
-        "issue", "data_shared",
-        "--issuer-key", E2E_AGENT_B, "--principal", h,
-        "--summary", "E2E test: shared compliance summary with the NANDA Registry.",
-        "--counterparty-label", "NANDA Registry",
-        "--granted-by", r2_id,
-        "--payload", '{"fields_shared":["compliance_summary"]}',
-        "--out", str(r3),
-    ])
+    action = runner.invoke(
+        app,
+        [
+            "issue",
+            "data_shared",
+            "--issuer-key",
+            E2E_AGENT_B,
+            "--principal",
+            h,
+            "--summary",
+            "E2E test: shared compliance summary with the NANDA Registry.",
+            "--counterparty-label",
+            "NANDA Registry",
+            "--granted-by",
+            r2_id,
+            "--payload",
+            '{"fields_shared":["compliance_summary"]}',
+            "--out",
+            str(r3),
+        ],
+    )
     assert action.exit_code == 0, action.output
 
     # Bundle into a trace
@@ -96,19 +129,47 @@ def test_chain_with_tampered_middle_receipt_renders_as_forged(runner, tmp_path):
     b = did_for_seed(runner, E2E_AGENT_B)
 
     r1 = tmp_path / "r1.json"
-    runner.invoke(app, [
-        "grant", "--issuer-key", E2E_HUMAN, "--principal", h, "--to", a,
-        "--scope", "data_shared,authority_granted", "--expires", "2026-12-31T23:59:59Z",
-        "--out", str(r1),
-    ])
+    runner.invoke(
+        app,
+        [
+            "grant",
+            "--issuer-key",
+            E2E_HUMAN,
+            "--principal",
+            h,
+            "--to",
+            a,
+            "--scope",
+            "data_shared,authority_granted",
+            "--expires",
+            "2026-12-31T23:59:59Z",
+            "--out",
+            str(r1),
+        ],
+    )
     r1_id = parse_receipt_id(r1)
 
     r2 = tmp_path / "r2.json"
-    runner.invoke(app, [
-        "grant", "--issuer-key", E2E_AGENT_A, "--principal", h, "--to", b,
-        "--scope", "data_shared", "--expires", "2026-12-31T23:59:59Z",
-        "--granted-by", r1_id, "--out", str(r2),
-    ])
+    runner.invoke(
+        app,
+        [
+            "grant",
+            "--issuer-key",
+            E2E_AGENT_A,
+            "--principal",
+            h,
+            "--to",
+            b,
+            "--scope",
+            "data_shared",
+            "--expires",
+            "2026-12-31T23:59:59Z",
+            "--granted-by",
+            r1_id,
+            "--out",
+            str(r2),
+        ],
+    )
 
     # Tamper: rewrite the human_summary AFTER signing
     r2_body = json.loads(r2.read_text())

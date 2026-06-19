@@ -9,6 +9,8 @@ exactly the drift these primitives exist to prevent.
 
 from __future__ import annotations
 
+from typing import Any
+
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
@@ -23,11 +25,12 @@ _GOLDEN_SEED = bytes(range(32))
 _GOLDEN_B_DID = "did:key:z6MkehRgf7yJbgaGfYsdoAsKdBPE3dj2CYhowQdcjqSJgvVd"
 _GOLDEN_ENTRY = {
     "witness_did": "did:key:z6MkehRgf7yJbgaGfYsdoAsKdBPE3dj2CYhowQdcjqSJgvVd",
-    "signature": "aY8FOs0ah3t2BFRv9a6cGHUQ4Gd6CR3AxxIdQdM4Ca2q8H8QjddPrk9Uzfz4UvpBGG5LMb5Hc71LpZCyAEG+Cw==",
+    # Golden-vector Ed25519 signature: one indivisible base64 token, cannot wrap.
+    "signature": "aY8FOs0ah3t2BFRv9a6cGHUQ4Gd6CR3AxxIdQdM4Ca2q8H8QjddPrk9Uzfz4UvpBGG5LMb5Hc71LpZCyAEG+Cw==",  # noqa: E501
 }
 
 
-def _receipt(issuer_did: str, counterparty_did: str) -> dict:
+def _receipt(issuer_did: str, counterparty_did: str) -> dict[str, Any]:
     return {
         "version": "arp/0.1",
         "receipt_id": "fixed",
@@ -101,13 +104,19 @@ def test_third_party_witness_does_not_corroborate() -> None:
 def test_garbage_signature_not_corroborated() -> None:
     a, b = gen_key(), gen_key()
     r = _receipt(did_from_sk(a), did_from_sk(b))
-    r["evidence"] = {"witness_signatures": [{"witness_did": did_from_sk(b), "signature": "not-base64!!"}]}
+    r["evidence"] = {
+        "witness_signatures": [{"witness_did": did_from_sk(b), "signature": "not-base64!!"}]
+    }
     assert is_corroborated(r) is False
 
 
 def test_did_key_helpers_roundtrip_and_agree_with_identity() -> None:
     seed = gen_key()
-    pub = Ed25519PrivateKey.from_private_bytes(seed).public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    pub = (
+        Ed25519PrivateKey.from_private_bytes(seed)
+        .public_key()
+        .public_bytes(Encoding.Raw, PublicFormat.Raw)
+    )
     did = did_key_from_pubkey(pub)
     assert did == did_from_sk(seed)  # pubkey-form agrees with the seed-form deriver
     assert pubkey_from_did_key(did) == pub  # exact inverse

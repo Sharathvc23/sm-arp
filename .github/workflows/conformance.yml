@@ -19,7 +19,11 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: pip
       - run: pip install -e ".[conformance,cli,dev]"
+      # Lint + format gate over the whole tree (lib + harness + CLI + tests).
+      - run: ruff check .
+      - run: ruff format --check .
+      # Strict typing gate, scoped to the shipped library via [tool.mypy] config.
+      - run: mypy
       # Full suite via testpaths (sm_arp lib + conformance + cli) — not just
       # conformance/, so the consumable library's own tests gate every PR.
       - run: pytest -v
-      - run: ruff check sm_arp/

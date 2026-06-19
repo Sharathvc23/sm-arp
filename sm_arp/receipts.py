@@ -17,7 +17,7 @@ import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import jcs
 from cryptography.exceptions import InvalidSignature
@@ -52,7 +52,8 @@ def now_iso() -> str:
 def canonical_bytes(receipt: dict[str, Any], *, include_signature: bool) -> bytes:
     """JCS-canonical bytes of a receipt, with or without the signature field."""
     body = {k: v for k, v in receipt.items() if include_signature or k != "signature"}
-    return jcs.canonicalize(body)
+    # jcs is untyped (no py.typed); canonicalize returns bytes at runtime.
+    return cast(bytes, jcs.canonicalize(body))
 
 
 def chain_link(receipt: dict[str, Any]) -> str:
@@ -144,7 +145,15 @@ class VerifyResult:
         return cls(True, "accepted", "receipt verifies")
 
 
-_REQUIRED_TOP = ("version", "receipt_id", "issuer_did", "principal_did", "issued_at", "action", "signature")
+_REQUIRED_TOP = (
+    "version",
+    "receipt_id",
+    "issuer_did",
+    "principal_did",
+    "issued_at",
+    "action",
+    "signature",
+)
 
 
 def _check_structure(r: dict[str, Any], *, strict: bool) -> VerifyResult | None:
@@ -172,11 +181,11 @@ def verify_signature(r: dict[str, Any]) -> VerifyResult:
     """Resolve issuer_did and check the Ed25519 signature over canonical bytes."""
     try:
         pubkey = pubkey_from_did(r["issuer_did"])
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return VerifyResult(False, "signature", f"unresolvable issuer_did: {e}")
     try:
         sig = base64.b64decode(r["signature"])
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return VerifyResult(False, "signature", f"signature not base64: {e}")
     try:
         pubkey.verify(sig, canonical_bytes(r, include_signature=False))
@@ -204,7 +213,9 @@ def verify_authority_chain(r: dict[str, Any], grants: dict[str, dict[str, Any]])
     scope = mp.get("granted_scope", [])
     cat = r["action"]["category"]
     if cat not in scope and "*" not in scope:
-        return VerifyResult(False, "authority_chain", f"category {cat!r} outside grant scope {scope}")
+        return VerifyResult(
+            False, "authority_chain", f"category {cat!r} outside grant scope {scope}"
+        )
     if mp.get("granted_to_did") not in (None, r["issuer_did"]):
         return VerifyResult(False, "authority_chain", "issuer is not the grantee")
     return VerifyResult.accepted()
@@ -215,10 +226,14 @@ def verify_hash_chain(r: dict[str, Any], prior: dict[str, Any] | None) -> Verify
     declared = r.get("previous_receipt_hash")
     if prior is None:
         if declared:
-            return VerifyResult(False, "hash_chain", "genesis receipt declares a previous_receipt_hash")
+            return VerifyResult(
+                False, "hash_chain", "genesis receipt declares a previous_receipt_hash"
+            )
         return VerifyResult.accepted()
     if not declared:
-        return VerifyResult(False, "hash_chain", "missing previous_receipt_hash on a non-genesis receipt")
+        return VerifyResult(
+            False, "hash_chain", "missing previous_receipt_hash on a non-genesis receipt"
+        )
     if declared != chain_link(prior):
         return VerifyResult(False, "hash_chain", "previous_receipt_hash does not match predecessor")
     return VerifyResult.accepted()

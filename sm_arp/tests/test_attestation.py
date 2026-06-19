@@ -8,6 +8,7 @@ embedded golden values, so every resolver establishes standing identically.
 from __future__ import annotations
 
 import copy
+from typing import Any
 
 from sm_arp.vrp import build_attestation, facts_digest, verify_attestation
 
@@ -15,15 +16,20 @@ _SEED = bytes([7]) * 32
 _AS_OF = "2026-01-01T00:00:00Z"
 _FACTS = {
     "id": "did:key:zSubject",
-    "verifiable_receipts": {"ledger_uri": "https://x/ledger", "behavioral_merkle_root": "sha256:abc"},
+    "verifiable_receipts": {
+        "ledger_uri": "https://x/ledger",
+        "behavioral_merkle_root": "sha256:abc",
+    },
 }
 # Golden reference output for _FACTS signed by _SEED.
 _GOLDEN_DIGEST = "sha256:0174e48f03bc02d7c931561c750a50c796e4452d4488642ad963be1e91028787"
 _GOLDEN_ATTESTED_BY = "did:key:z6MkvDqGT54cXesYGvABpF1UapVNwjCqRcafi4Px6Thv5T3Z"
-_GOLDEN_SIG = "GG8Xve54JF4Qsym9Wo8h6AAtKMrK9VsTRehDplON5oPnZNDT+K9PcCFwaxG9Wa0X6UxnW2BQmOXqW5kRqmQEDw=="
+_GOLDEN_SIG = (
+    "GG8Xve54JF4Qsym9Wo8h6AAtKMrK9VsTRehDplON5oPnZNDT+K9PcCFwaxG9Wa0X6UxnW2BQmOXqW5kRqmQEDw=="
+)
 
 
-def _attested(**over):
+def _attested(**over: Any) -> dict[str, Any]:
     facts = copy.deepcopy(_FACTS)
     att = build_attestation(facts_record=facts, signing_key_bytes=_SEED, as_of=_AS_OF, **over)
     facts["attestation"] = att
@@ -32,7 +38,9 @@ def _attested(**over):
 
 def test_golden_digest_and_signature_byte_for_byte() -> None:
     assert facts_digest(_FACTS) == _GOLDEN_DIGEST
-    att = build_attestation(facts_record=copy.deepcopy(_FACTS), signing_key_bytes=_SEED, as_of=_AS_OF)
+    att = build_attestation(
+        facts_record=copy.deepcopy(_FACTS), signing_key_bytes=_SEED, as_of=_AS_OF
+    )
     assert att["attested_by"] == _GOLDEN_ATTESTED_BY
     assert att["signature"] == _GOLDEN_SIG
 

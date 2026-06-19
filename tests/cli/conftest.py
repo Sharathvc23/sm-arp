@@ -11,7 +11,6 @@ from typer.testing import CliRunner
 
 from arp_cli.cli import app
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VECTORS_DIR = REPO_ROOT / "vectors" / "arp" / "0.1"
 NANDA_TRACE = REPO_ROOT / "nanda" / "nanda_interaction_trace.json"

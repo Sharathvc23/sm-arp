@@ -70,11 +70,11 @@ def _corroborated(issuer: Identity, cp_seed: bytes, cp: Identity, rid: str) -> d
         "receipt_id": rid,
         "issuer_did": issuer.did,
         "issued_at": "2026-01-01T00:00:00Z",
-        "action": build_action(
-            category="purchase", human_summary="x", counterparty_did=cp.did
-        ),
+        "action": build_action(category="purchase", human_summary="x", counterparty_did=cp.did),
     }
-    receipt["evidence"] = {"witness_signatures": [cosign_receipt(receipt, signing_key_bytes=cp_seed)]}
+    receipt["evidence"] = {
+        "witness_signatures": [cosign_receipt(receipt, signing_key_bytes=cp_seed)]
+    }
     return receipt
 
 
@@ -133,7 +133,9 @@ def main() -> None:
         ),
     }
     print("before counterparty cosign -> is_corroborated =", is_corroborated(base))
-    base["evidence"] = {"witness_signatures": [cosign_receipt(base, signing_key_bytes=bytes([2]) * 32)]}
+    base["evidence"] = {
+        "witness_signatures": [cosign_receipt(base, signing_key_bytes=bytes([2]) * 32)]
+    }
     print("after counterparty cosign  -> is_corroborated =", is_corroborated(base))
 
     _banner("4. Reputation scoring (nanda-rep) + collusion severance")
