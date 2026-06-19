@@ -12,7 +12,7 @@ import json
 import re
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +20,6 @@ import base58
 import jcs
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
 
 # ── seeds and identities ───────────────────────────────────────────
 
@@ -54,11 +53,12 @@ def parse_seed(spec: str) -> bytes:
         if len(raw) == 32:
             return raw
         raise ValueError(
-            f"seed file must contain 32 raw bytes or base64-encoded 32 bytes; got {len(raw)} bytes / {len(content)} chars"
+            "seed file must contain 32 raw bytes or base64-encoded 32 bytes; "
+            f"got {len(raw)} bytes / {len(content)} chars"
         )
 
     if spec.startswith("base64:"):
-        decoded = base64.b64decode(spec[len("base64:"):], validate=True)
+        decoded = base64.b64decode(spec[len("base64:") :], validate=True)
         if len(decoded) != 32:
             raise ValueError(f"base64 seed decodes to {len(decoded)} bytes, expected 32")
         return decoded
@@ -98,13 +98,13 @@ def did_key_for_seed(seed: bytes) -> str:
 # Well-known demo seeds (committed to the repo); warn if encountered in
 # `arp issue` so users don't accidentally sign production traffic with them.
 DEMO_SEEDS_HEX: set[str] = {
-    bytes(b"nanda-demo-human-principal-32by!").hex(),
-    bytes(b"nanda-demo-agent-a-seed-32-byte!").hex(),
-    bytes(b"nanda-demo-agent-b-seed-32-byte!").hex(),
-    bytes(b"arp-vector-issuer-seed-32bytes!!").hex(),
-    bytes(b"arp-vector-principal-seed-32by!!").hex(),
-    bytes(b"arp-vector-witness-seed-32bytes!").hex(),
-    bytes(b"arp-vector-counterparty-seed32b!").hex(),
+    b"nanda-demo-human-principal-32by!".hex(),
+    b"nanda-demo-agent-a-seed-32-byte!".hex(),
+    b"nanda-demo-agent-b-seed-32-byte!".hex(),
+    b"arp-vector-issuer-seed-32bytes!!".hex(),
+    b"arp-vector-principal-seed-32by!!".hex(),
+    b"arp-vector-witness-seed-32bytes!".hex(),
+    b"arp-vector-counterparty-seed32b!".hex(),
 }
 
 
@@ -115,12 +115,8 @@ def seed_is_well_known(seed: bytes) -> bool:
 # ── receipts ───────────────────────────────────────────────────────
 
 
-_UUID_V4_RE = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-)
-_RFC3339_UTC_RE = re.compile(
-    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
-)
+_UUID_V4_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+_RFC3339_UTC_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 
 
 def new_receipt_id() -> str:
@@ -129,7 +125,7 @@ def new_receipt_id() -> str:
 
 def now_iso() -> str:
     """RFC 3339, second-precision, UTC, Z suffix — matches the issued_at pattern."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def build_action(
@@ -214,7 +210,7 @@ def parse_payload(json_str: str | None) -> dict[str, Any] | None:
     try:
         out = json.loads(json_str)
     except json.JSONDecodeError as e:
-        raise ValueError(f"--payload is not valid JSON: {e}")
+        raise ValueError(f"--payload is not valid JSON: {e}") from e
     if not isinstance(out, dict):
         raise ValueError("--payload must be a JSON object")
     return out

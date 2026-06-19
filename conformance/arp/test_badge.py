@@ -10,9 +10,9 @@ import pytest
 
 pytest.importorskip("sm_conformance")
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: E402
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from conformance.arp.badge import (  # noqa: E402
+from conformance.arp.badge import (
     PROFILE_EXTENSION_KEY,
     arp_suite_digest,
     build_arp_badge,

@@ -47,11 +47,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import base58
 import jcs
+from _arp_v01 import verify_receipt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
-from _arp_v01 import verify_receipt
-
 
 # ── deterministic demo identities ───────────────────────────────────
 #
@@ -60,11 +58,11 @@ from _arp_v01 import verify_receipt
 # anyone with this file can sign as the "Human Principal", "Agent A",
 # or "Agent B" identities below.
 
-HUMAN_SEED   = b"nanda-demo-human-principal-32by!"
+HUMAN_SEED = b"nanda-demo-human-principal-32by!"
 AGENT_A_SEED = b"nanda-demo-agent-a-seed-32-byte!"
 AGENT_B_SEED = b"nanda-demo-agent-b-seed-32-byte!"
 
-assert len(HUMAN_SEED)   == 32
+assert len(HUMAN_SEED) == 32
 assert len(AGENT_A_SEED) == 32
 assert len(AGENT_B_SEED) == 32
 
@@ -100,11 +98,11 @@ def sign_receipt(sk: Ed25519PrivateKey, receipt: dict) -> dict:
 
 # ── identity setup ──────────────────────────────────────────────────
 
-HUMAN_SK,   HUMAN_PK   = keypair(HUMAN_SEED)
+HUMAN_SK, HUMAN_PK = keypair(HUMAN_SEED)
 AGENT_A_SK, AGENT_A_PK = keypair(AGENT_A_SEED)
 AGENT_B_SK, AGENT_B_PK = keypair(AGENT_B_SEED)
 
-HUMAN_DID   = did_key_from_pubkey(HUMAN_PK)
+HUMAN_DID = did_key_from_pubkey(HUMAN_PK)
 AGENT_A_DID = did_key_from_pubkey(AGENT_A_PK)
 AGENT_B_DID = did_key_from_pubkey(AGENT_B_PK)
 
@@ -142,7 +140,7 @@ def build_receipt_1_grant() -> dict:
     r: dict = {
         "version": "arp/0.1",
         "receipt_id": RECEIPT_1_ID,
-        "issuer_did":    HUMAN_DID,
+        "issuer_did": HUMAN_DID,
         "principal_did": HUMAN_DID,
         "issued_at": ISSUED_AT_1,
         "action": {
@@ -176,14 +174,13 @@ def build_receipt_2_delegation() -> dict:
     r: dict = {
         "version": "arp/0.1",
         "receipt_id": RECEIPT_2_ID,
-        "issuer_did":    AGENT_A_DID,
+        "issuer_did": AGENT_A_DID,
         "principal_did": HUMAN_DID,
         "issued_at": ISSUED_AT_2,
         "action": {
             "category": "authority_granted",
             "human_summary": (
-                "Sub-delegated data-sharing authority to Agent B under the Human "
-                "Principal's grant."
+                "Sub-delegated data-sharing authority to Agent B under the Human Principal's grant."
             ),
             "outcome": "completed",
             "granted_by_receipt_id": RECEIPT_1_ID,
@@ -213,7 +210,7 @@ def build_receipt_3_action() -> dict:
     r: dict = {
         "version": "arp/0.1",
         "receipt_id": RECEIPT_3_ID,
-        "issuer_did":    AGENT_B_DID,
+        "issuer_did": AGENT_B_DID,
         "principal_did": HUMAN_DID,
         "issued_at": ISSUED_AT_3,
         "action": {
@@ -239,7 +236,7 @@ def build_receipt_3_action() -> dict:
 
 
 def _walk_edge(child: dict, parent: dict) -> None:
-    """Enforce spec §4.5 steps 1–5 for one edge (child → parent grant).
+    """Enforce spec §4.5 steps 1-5 for one edge (child → parent grant).
 
     Step 6 (revocation check) is N/A in this demo — no authority_revoked
     receipts exist in the trace.
