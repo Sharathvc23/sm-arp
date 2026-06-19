@@ -44,10 +44,12 @@ conformance = [
 cli = [
     "typer>=0.12",
 ]
-# Everything needed to run the full test suite (lib + conformance + cli).
+# Everything needed to run the full test suite (lib + conformance + cli) plus
+# the lint/type gates (ruff + mypy) that CI enforces.
 dev = [
     "pytest>=8.0",
     "ruff>=0.6",
+    "mypy>=1.8",
 ]
 
 [project.urls]
@@ -63,5 +65,37 @@ Repository = "https://github.com/Sharathvc23/sm-arp"
 where = ["."]
 include = ["sm_arp*"]
 
+# Ship the PEP 561 `py.typed` marker so downstream consumers see `sm_arp`'s
+# inline type hints (without it, mypy treats the installed package as untyped).
+[tool.setuptools.package-data]
+sm_arp = ["py.typed"]
+
 [tool.pytest.ini_options]
 testpaths = ["sm_arp", "conformance", "tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+# E/F = pycodestyle+pyflakes core, I = import sorting, UP = pyupgrade,
+# B = bugbear, SIM = simplify, C4 = comprehensions, RUF = ruff-native.
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# Typer uses `param: T = typer.Option(...)` / `typer.Argument(...)` as the
+# canonical way to declare CLI parameters; B008 (function-call-in-default)
+# is a false positive for that idiom. Scoped to the CLI so B008 still guards
+# genuine mutable-default bugs everywhere else.
+"arp_cli/cli.py" = ["B008"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["sm_arp"]
+
+[[tool.mypy.overrides]]
+# `jcs` (JSON Canonicalization Scheme) ships no type stubs / py.typed marker;
+# ignore the missing-import error for this third-party dep only.
+module = "jcs.*"
+ignore_missing_imports = true
