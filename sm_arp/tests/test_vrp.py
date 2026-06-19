@@ -67,7 +67,9 @@ def test_tamper_changes_root() -> None:
 
 def test_odd_count() -> None:
     rs = [_r(i) for i in range(3)]
-    assert behavioral_merkle_root(rs).startswith("sha256:")
+    root = behavioral_merkle_root(rs)
+    assert root is not None
+    assert root.startswith("sha256:")
 
 
 # ── nanda-rep/0.1 ──

@@ -7,11 +7,9 @@ a regression net.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from arp_cli.cli import app
 from tests.cli.conftest import did_for_seed, parse_receipt_id, strip_ansi
-
 
 E2E_HUMAN = "tests-cli-e2e-human-seed-32-bts!"
 E2E_AGENT_A = "tests-cli-e2e-agent-a-seed-32bt!"

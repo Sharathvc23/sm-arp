@@ -103,7 +103,8 @@ DEMO_SPINE: list[tuple[str, str]] = [
     ),
     (
         "12-chain-linked",
-        "tamper-evident hash chain over time — previous_receipt_hash links back to a prior receipt.",
+        "tamper-evident hash chain over time — previous_receipt_hash links back "
+        "to a prior receipt.",
     ),
     (
         "04-data-shared-gdpr",
@@ -118,7 +119,9 @@ DEMO_SPINE: list[tuple[str, str]] = [
         "forward compatibility — unknown extensions and categories preserved, not rejected.",
     ),
     (
-        "nanda_interaction_trace",  # sentinel: handled specially (it's a trace file, not a vector)
-        "cross-principal authority graph — Receipt 3 -> Receipt 2 -> Receipt 1 walks back to the human.",
+        # sentinel: handled specially (it's a trace file, not a vector)
+        "nanda_interaction_trace",
+        "cross-principal authority graph — Receipt 3 -> Receipt 2 -> Receipt 1 "
+        "walks back to the human.",
     ),
 ]

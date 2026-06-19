@@ -8,13 +8,9 @@ from __future__ import annotations
 
 import base64
 import json
-from pathlib import Path
-
-import pytest
 
 from arp_cli.cli import app
 from tests.cli.conftest import did_for_seed, strip_ansi
-
 
 # Seeds chosen to NOT collide with the well-known demo seeds, so tests
 # don't trip the "well-known seed" warning.
@@ -177,7 +173,6 @@ def test_issue_invalid_payload_errors(runner):
 
 
 def test_issue_malformed_principal_warns_and_exits_nonzero(runner):
-    did = did_for_seed(runner, TEST_AGENT_SEED)
     result = runner.invoke(
         app,
         [

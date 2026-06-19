@@ -99,3 +99,11 @@ files = ["sm_arp"]
 # ignore the missing-import error for this third-party dep only.
 module = "jcs.*"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# `conformance` is a repo/dev harness, not the shipped library; it is out of
+# the strict-typing scope (the published wheel excludes it). One test in
+# `sm_arp.tests` imports it deliberately, which makes mypy follow it — relax
+# errors there so the gate stays focused on the consumable `sm_arp` package.
+module = "conformance.*"
+ignore_errors = true

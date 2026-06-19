@@ -1,4 +1,4 @@
-"""Conformance for ``sm_arp.vrp`` nanda-rep/0.2 scoring (VRP 0.3 §B–C).
+"""Conformance for ``sm_arp.vrp`` nanda-rep/0.2 scoring (VRP 0.3 §B-C).
 
 Pins ``reputation_score_v2`` + ``corroboration_rate`` — including collusion
 severance — so every resolver computes identical reputation. Golden values are
@@ -6,6 +6,8 @@ golden reference output for fixed-seed scenarios.
 """
 
 from __future__ import annotations
+
+from typing import Any
 
 from sm_arp.identity import did_from_sk
 from sm_arp.vrp import (
@@ -20,7 +22,7 @@ from sm_arp.vrp import (
 _TRUE = lambda _r: True  # noqa: E731 — all receipts ARP-valid; corroboration is what's under test
 
 
-def _corroborated(issuer_seed: bytes, cp_seed: bytes, rid: str) -> dict:
+def _corroborated(issuer_seed: bytes, cp_seed: bytes, rid: str) -> dict[str, Any]:
     from sm_arp.vrp import cosign_receipt
 
     r = {
@@ -39,7 +41,7 @@ def _corroborated(issuer_seed: bytes, cp_seed: bytes, rid: str) -> dict:
     return r
 
 
-def _uncorroborated(issuer_seed: bytes, cp_seed: bytes, rid: str) -> dict:
+def _uncorroborated(issuer_seed: bytes, cp_seed: bytes, rid: str) -> dict[str, Any]:
     return {
         "version": "arp/0.1",
         "receipt_id": rid,

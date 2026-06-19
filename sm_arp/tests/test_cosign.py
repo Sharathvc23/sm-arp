@@ -9,6 +9,8 @@ exactly the drift these primitives exist to prevent.
 
 from __future__ import annotations
 
+from typing import Any
+
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
@@ -23,11 +25,12 @@ _GOLDEN_SEED = bytes(range(32))
 _GOLDEN_B_DID = "did:key:z6MkehRgf7yJbgaGfYsdoAsKdBPE3dj2CYhowQdcjqSJgvVd"
 _GOLDEN_ENTRY = {
     "witness_did": "did:key:z6MkehRgf7yJbgaGfYsdoAsKdBPE3dj2CYhowQdcjqSJgvVd",
-    "signature": "aY8FOs0ah3t2BFRv9a6cGHUQ4Gd6CR3AxxIdQdM4Ca2q8H8QjddPrk9Uzfz4UvpBGG5LMb5Hc71LpZCyAEG+Cw==",
+    # Golden-vector Ed25519 signature: one indivisible base64 token, cannot wrap.
+    "signature": "aY8FOs0ah3t2BFRv9a6cGHUQ4Gd6CR3AxxIdQdM4Ca2q8H8QjddPrk9Uzfz4UvpBGG5LMb5Hc71LpZCyAEG+Cw==",  # noqa: E501
 }
 
 
-def _receipt(issuer_did: str, counterparty_did: str) -> dict:
+def _receipt(issuer_did: str, counterparty_did: str) -> dict[str, Any]:
     return {
         "version": "arp/0.1",
         "receipt_id": "fixed",

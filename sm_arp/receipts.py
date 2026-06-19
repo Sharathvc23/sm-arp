@@ -17,7 +17,7 @@ import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import jcs
 from cryptography.exceptions import InvalidSignature
@@ -52,7 +52,8 @@ def now_iso() -> str:
 def canonical_bytes(receipt: dict[str, Any], *, include_signature: bool) -> bytes:
     """JCS-canonical bytes of a receipt, with or without the signature field."""
     body = {k: v for k, v in receipt.items() if include_signature or k != "signature"}
-    return jcs.canonicalize(body)
+    # jcs is untyped (no py.typed); canonicalize returns bytes at runtime.
+    return cast(bytes, jcs.canonicalize(body))
 
 
 def chain_link(receipt: dict[str, Any]) -> str:
@@ -180,11 +181,11 @@ def verify_signature(r: dict[str, Any]) -> VerifyResult:
     """Resolve issuer_did and check the Ed25519 signature over canonical bytes."""
     try:
         pubkey = pubkey_from_did(r["issuer_did"])
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return VerifyResult(False, "signature", f"unresolvable issuer_did: {e}")
     try:
         sig = base64.b64decode(r["signature"])
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return VerifyResult(False, "signature", f"signature not base64: {e}")
     try:
         pubkey.verify(sig, canonical_bytes(r, include_signature=False))

@@ -8,6 +8,7 @@ embedded golden values, so every resolver establishes standing identically.
 from __future__ import annotations
 
 import copy
+from typing import Any
 
 from sm_arp.vrp import build_attestation, facts_digest, verify_attestation
 
@@ -28,7 +29,7 @@ _GOLDEN_SIG = (
 )
 
 
-def _attested(**over):
+def _attested(**over: Any) -> dict[str, Any]:
     facts = copy.deepcopy(_FACTS)
     att = build_attestation(facts_record=facts, signing_key_bytes=_SEED, as_of=_AS_OF, **over)
     facts["attestation"] = att

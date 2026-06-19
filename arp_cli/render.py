@@ -11,11 +11,9 @@ is two or three delegation hops removed from the human principal.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from conformance.arp import compute_chain_link, verify_receipt
-
 
 # Minimal ANSI styling — keeps render.py free of typer/click so the
 # module can be reused outside the CLI (e.g. a future web Agency Log).
@@ -57,7 +55,7 @@ _CATEGORY_VERB = {
 def _format_timestamp(iso: str) -> str:
     """2026-06-03T12:30:00Z → 'Wed Jun 3, 2026 — 12:30 PM UTC'."""
     try:
-        dt = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(timezone.utc)
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(UTC)
     except ValueError:
         return iso
     # Use platform-independent day-of-month (no leading zero)
@@ -98,7 +96,7 @@ def _short_did(did: str) -> str:
     return did[:20] + "…"
 
 
-def _summary(receipt: dict, *, lang: Optional[str] = None) -> str:
+def _summary(receipt: dict, *, lang: str | None = None) -> str:
     """Pull the human_summary in the requested language, falling back gracefully.
 
     Resolution order (per spec §9.2):
@@ -131,7 +129,7 @@ def _summary(receipt: dict, *, lang: Optional[str] = None) -> str:
 def _verify_status(
     receipt: dict,
     *,
-    priors: Optional[dict[str, dict]] = None,
+    priors: dict[str, dict] | None = None,
 ) -> tuple[str, str, str]:
     """Verify the receipt and classify the outcome for the human-facing view.
 
@@ -165,8 +163,8 @@ def render_receipt(
     receipt: dict,
     *,
     show_crypto: bool = False,
-    priors: Optional[dict[str, dict]] = None,
-    lang: Optional[str] = None,
+    priors: dict[str, dict] | None = None,
+    lang: str | None = None,
     indent: str = "",
 ) -> str:
     """Render a single receipt as a diary entry.
@@ -251,7 +249,7 @@ def render_trace(
     trace: list[dict],
     *,
     show_crypto: bool = False,
-    lang: Optional[str] = None,
+    lang: str | None = None,
 ) -> str:
     """Render a chronological trace, surfacing both edge types inline.
 
@@ -292,7 +290,10 @@ def render_trace(
             prior_summary = _summary(prior, lang=lang)
             if len(prior_summary) > 70:
                 prior_summary = prior_summary[:67] + "…"
-            block += f'\n      ↳ follows tamper-chain from earlier receipt at {prior_when}:\n         "{prior_summary}"'
+            block += (
+                f"\n      ↳ follows tamper-chain from earlier receipt at {prior_when}:"
+                f'\n         "{prior_summary}"'
+            )
 
         blocks.append(block)
 

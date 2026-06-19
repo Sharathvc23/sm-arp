@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
 from pathlib import Path
-from typing import Optional
 
 import typer
 
-from arp_cli import corpus, issue as _issue, narrate, render as _render
+from arp_cli import corpus, narrate
+from arp_cli import issue as _issue
+from arp_cli import render as _render
 from conformance.arp import compute_chain_link, verify_receipt
 
 app = typer.Typer(
@@ -38,13 +40,13 @@ def _load(path: Path) -> dict | list:
         return json.loads(path.read_text())
     except json.JSONDecodeError as e:
         typer.secho(f"error: {path}: invalid JSON: {e}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=2)
+        raise typer.Exit(code=2) from e
 
 
 def _verify_one(
     receipt: dict,
     mode: str,
-    priors: Optional[dict[str, dict]] = None,
+    priors: dict[str, dict] | None = None,
 ) -> tuple[bool, str, str]:
     """Run verify_receipt and return (ok, stage, detail).
 
@@ -76,9 +78,8 @@ def verify(
     receipts: list[dict] = body if isinstance(body, list) else [body]
 
     typer.echo()
-    typer.echo(
-        f"verifying {file}  (mode={mode}, {len(receipts)} receipt{'s' if len(receipts) != 1 else ''})"
-    )
+    plural = "s" if len(receipts) != 1 else ""
+    typer.echo(f"verifying {file}  (mode={mode}, {len(receipts)} receipt{plural})")
     typer.echo()
 
     # Build a priors map from the trace itself so hash-chain links can resolve.
@@ -210,12 +211,19 @@ def render(
     show_crypto: bool = typer.Option(
         False,
         "--show-crypto",
-        help="Include DIDs, UUIDs, hashes, and a signature snippet. Drops back into the developer view.",
+        help=(
+            "Include DIDs, UUIDs, hashes, and a signature snippet. "
+            "Drops back into the developer view."
+        ),
     ),
-    lang: Optional[str] = typer.Option(
+    lang: str | None = typer.Option(
         None,
         "--lang",
-        help="BCP 47 language tag (e.g. 'de-DE', 'ja-JP', 'es'). If accessibility.alt_summaries has a match, render that instead of the primary summary (spec §9.2).",
+        help=(
+            "BCP 47 language tag (e.g. 'de-DE', 'ja-JP', 'es'). If "
+            "accessibility.alt_summaries has a match, render that instead of "
+            "the primary summary (spec §9.2)."
+        ),
     ),
 ) -> None:
     """Render a receipt or trace as a human-facing diary entry.
@@ -247,7 +255,7 @@ def render(
 # ── walk-authority ─────────────────────────────────────────────────
 
 
-def _walk_authority_edge(child: dict, parent: dict) -> Optional[str]:
+def _walk_authority_edge(child: dict, parent: dict) -> str | None:
     """Return None if the edge passes spec §4.5 checks 1-5, else an error string."""
     cid = child["receipt_id"]
     pid = parent["receipt_id"]
@@ -271,7 +279,7 @@ def _walk_authority_edge(child: dict, parent: dict) -> Optional[str]:
 @app.command(name="walk-authority")
 def walk_authority(
     file: Path = typer.Argument(..., help="Path to a trace JSON file (array of receipts)."),
-    start: Optional[str] = typer.Option(
+    start: str | None = typer.Option(
         None,
         "--start",
         help="Receipt id to start the walk from. Defaults to the last receipt in the file.",
@@ -414,7 +422,7 @@ def vectors_run(
         meta = corpus.get_vector(vector_id)
     except KeyError as e:
         typer.secho(f"error: {e.args[0]}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=2)
+        raise typer.Exit(code=2) from e
     body = meta.load()
     receipt = body["receipt"]
     expected = meta.expected_outcome
@@ -512,7 +520,8 @@ def _demo_key_facts(receipt: dict) -> None:
         j = receipt["jurisdiction"]
         narrate.kv(
             "jurisdiction",
-            f"residence={j.get('principal_residence', '?')}, regimes={j.get('applicable_regimes', [])}",
+            f"residence={j.get('principal_residence', '?')}, "
+            f"regimes={j.get('applicable_regimes', [])}",
         )
         acc = receipt.get("accessibility", {})
         if "alt_summaries" in acc:
@@ -582,7 +591,8 @@ def demo() -> None:
     """The 5-step ARP tour. Reads only — no keys, no network. Idempotent."""
     narrate.banner("ARP v0.1 demo — the format in five steps")
     narrate.note(
-        f"corpus: {corpus.VECTORS_DIR.relative_to(corpus.REPO_ROOT)} ({len(corpus.list_vectors())} vectors)"
+        f"corpus: {corpus.VECTORS_DIR.relative_to(corpus.REPO_ROOT)} "
+        f"({len(corpus.list_vectors())} vectors)"
     )
     narrate.note(f"trace:  {corpus.NANDA_TRACE.relative_to(corpus.REPO_ROOT)} (if present)")
 
@@ -607,7 +617,7 @@ def demo() -> None:
 # ── write-side: keygen, issue, grant, revoke ──────────────────────
 
 
-def _emit_receipt(receipt: dict, out: Optional[Path]) -> None:
+def _emit_receipt(receipt: dict, out: Path | None) -> None:
     """Write the receipt to --out or stdout, then verify it (paranoia)."""
     text = json.dumps(receipt, indent=2, ensure_ascii=False) + "\n"
     if out:
@@ -633,7 +643,7 @@ def _resolve_seed(spec: str) -> bytes:
         seed = _issue.parse_seed(spec)
     except ValueError as e:
         typer.secho(f"error: --issuer-key: {e}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=2)
+        raise typer.Exit(code=2) from e
     if _issue.seed_is_well_known(seed):
         typer.secho(
             "warning: this is a well-known demo seed; do not sign production traffic with it.",
@@ -645,12 +655,12 @@ def _resolve_seed(spec: str) -> bytes:
 
 @app.command()
 def keygen(
-    seed: Optional[str] = typer.Option(
+    seed: str | None = typer.Option(
         None,
         "--seed",
         help="Use a specific 32-byte ASCII seed (demo only). Default: cryptographically random.",
     ),
-    out: Optional[Path] = typer.Option(
+    out: Path | None = typer.Option(
         None,
         "--out",
         "-o",
@@ -671,10 +681,8 @@ def keygen(
 
     if out:
         out.write_text(seed_b64 + "\n")
-        try:
+        with contextlib.suppress(OSError):
             out.chmod(0o600)
-        except OSError:
-            pass
         typer.secho(f"wrote seed to {out} (mode 0600)", fg=typer.colors.GREEN)
         typer.echo(f"did: {did}")
     else:
@@ -706,36 +714,34 @@ def issue(
     outcome: str = typer.Option(
         "completed", "--outcome", help="One of: completed, failed, partial, reversed, pending."
     ),
-    counterparty: Optional[str] = typer.Option(
-        None, "--counterparty", help="Counterparty did:key."
-    ),
-    counterparty_label: Optional[str] = typer.Option(
+    counterparty: str | None = typer.Option(None, "--counterparty", help="Counterparty did:key."),
+    counterparty_label: str | None = typer.Option(
         None, "--counterparty-label", help="Human-readable counterparty name."
     ),
-    amount_cents: Optional[int] = typer.Option(
+    amount_cents: int | None = typer.Option(
         None, "--amount", help="Amount in cents (negative = outgoing)."
     ),
     currency: str = typer.Option(
         "USD", "--currency", help="ISO 4217 currency (used only if --amount given)."
     ),
-    granted_by: Optional[str] = typer.Option(
+    granted_by: str | None = typer.Option(
         None,
         "--granted-by",
         help="receipt_id of the authority_granted receipt that authorizes this action.",
     ),
-    reverses: Optional[str] = typer.Option(
+    reverses: str | None = typer.Option(
         None, "--reverses", help="receipt_id of the receipt this one reverses (issuer must match)."
     ),
-    payload: Optional[str] = typer.Option(
+    payload: str | None = typer.Option(
         None, "--payload", help="JSON object for action.machine_payload."
     ),
-    receipt_id: Optional[str] = typer.Option(
+    receipt_id: str | None = typer.Option(
         None, "--id", help="Override the receipt_id (default: random UUIDv4)."
     ),
-    issued_at: Optional[str] = typer.Option(
+    issued_at: str | None = typer.Option(
         None, "--issued-at", help="Override issued_at (default: now, UTC second precision)."
     ),
-    out: Optional[Path] = typer.Option(
+    out: Path | None = typer.Option(
         None, "--out", "-o", help="Write the receipt to this file (default: stdout)."
     ),
 ) -> None:
@@ -771,7 +777,7 @@ def issue(
         )
     except ValueError as e:
         typer.secho(f"error: {e}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=2)
+        raise typer.Exit(code=2) from e
 
     _issue.sign(seed, receipt)
     _emit_receipt(receipt, out)
@@ -785,30 +791,36 @@ def grant(
     principal: str = typer.Option(
         ...,
         "--principal",
-        help="Principal did:key — the human at the root of the chain. Per spec §4.5 step 2, MUST be the same for every grant in a chain.",
+        help=(
+            "Principal did:key — the human at the root of the chain. Per spec "
+            "§4.5 step 2, MUST be the same for every grant in a chain."
+        ),
     ),
     to: str = typer.Option(..., "--to", help="did:key of the agent receiving the authority."),
     scope: str = typer.Option(
         ...,
         "--scope",
-        help="Comma-separated action categories (or '*' for any). Example: 'data_shared,message_sent'.",
+        help=(
+            "Comma-separated action categories (or '*' for any). "
+            "Example: 'data_shared,message_sent'."
+        ),
     ),
     expires: str = typer.Option(
         ...,
         "--expires",
         help="grant_expires_at — RFC 3339 UTC second-precision (e.g. 2026-12-31T23:59:59Z).",
     ),
-    summary: Optional[str] = typer.Option(
+    summary: str | None = typer.Option(
         None, "--summary", "-s", help="Override the auto-generated human_summary."
     ),
-    granted_by: Optional[str] = typer.Option(
+    granted_by: str | None = typer.Option(
         None,
         "--granted-by",
         help="receipt_id of the parent grant (set for sub-delegation; omit for genesis grants).",
     ),
-    receipt_id: Optional[str] = typer.Option(None, "--id", help="Override the receipt_id."),
-    issued_at: Optional[str] = typer.Option(None, "--issued-at", help="Override issued_at."),
-    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Write the receipt to this file."),
+    receipt_id: str | None = typer.Option(None, "--id", help="Override the receipt_id."),
+    issued_at: str | None = typer.Option(None, "--issued-at", help="Override issued_at."),
+    out: Path | None = typer.Option(None, "--out", "-o", help="Write the receipt to this file."),
 ) -> None:
     """Emit an authority_granted receipt with the required machine_payload shape.
 
@@ -851,7 +863,7 @@ def grant(
         )
     except ValueError as e:
         typer.secho(f"error: {e}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=2)
+        raise typer.Exit(code=2) from e
 
     _issue.sign(seed, receipt)
     _emit_receipt(receipt, out)
@@ -870,12 +882,12 @@ def revoke(
     revokes: str = typer.Option(
         ..., "--revokes", help="receipt_id of the authority_granted receipt being revoked."
     ),
-    summary: Optional[str] = typer.Option(
+    summary: str | None = typer.Option(
         None, "--summary", "-s", help="Override the auto-generated human_summary."
     ),
-    receipt_id: Optional[str] = typer.Option(None, "--id", help="Override the receipt_id."),
-    issued_at: Optional[str] = typer.Option(None, "--issued-at", help="Override issued_at."),
-    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Write the receipt to this file."),
+    receipt_id: str | None = typer.Option(None, "--id", help="Override the receipt_id."),
+    issued_at: str | None = typer.Option(None, "--issued-at", help="Override issued_at."),
+    out: Path | None = typer.Option(None, "--out", "-o", help="Write the receipt to this file."),
 ) -> None:
     """Emit an authority_revoked receipt that supersedes a prior grant.
 
@@ -901,7 +913,7 @@ def revoke(
         )
     except ValueError as e:
         typer.secho(f"error: {e}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=2)
+        raise typer.Exit(code=2) from e
 
     _issue.sign(seed, receipt)
     _emit_receipt(receipt, out)

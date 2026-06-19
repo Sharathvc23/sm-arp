@@ -5,13 +5,8 @@ typer.testing.CliRunner.
 
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from arp_cli.cli import app
 from tests.cli.conftest import strip_ansi
-
 
 # ── arp verify ─────────────────────────────────────────────────────
 

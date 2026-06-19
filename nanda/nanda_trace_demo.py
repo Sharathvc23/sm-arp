@@ -47,11 +47,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import base58
 import jcs
+from _arp_v01 import verify_receipt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
-from _arp_v01 import verify_receipt
-
 
 # ── deterministic demo identities ───────────────────────────────────
 #
@@ -238,7 +236,7 @@ def build_receipt_3_action() -> dict:
 
 
 def _walk_edge(child: dict, parent: dict) -> None:
-    """Enforce spec §4.5 steps 1–5 for one edge (child → parent grant).
+    """Enforce spec §4.5 steps 1-5 for one edge (child → parent grant).
 
     Step 6 (revocation check) is N/A in this demo — no authority_revoked
     receipts exist in the trace.

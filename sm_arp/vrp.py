@@ -42,7 +42,7 @@ _ED25519_MULTICODEC = b"\xed\x01"
 LIFECYCLE_STATES = ("active", "suspended", "revoked")
 
 SCORING_METHOD = "nanda-rep/0.1"
-# VRP 0.3 §A–C: counterparty-corroborated, collusion-resistant. A receipt counts
+# VRP 0.3 §A-C: counterparty-corroborated, collusion-resistant. A receipt counts
 # toward reputation only if a DISTINCT counterparty co-signed it (§A) and it
 # survives collusion severance (§B); see ``cosign_receipt`` / ``is_corroborated``.
 SCORING_METHOD_V2 = "nanda-rep/0.2"

@@ -78,7 +78,7 @@ class ReceiptLog:
     def _q(self, where: str, args: tuple[Any, ...], limit: int) -> list[dict[str, Any]]:
         with self._conn() as c:
             rows = c.execute(
-                f"SELECT receipt_json FROM receipts {where} ORDER BY issued_at DESC LIMIT ?",  # noqa: S608
+                f"SELECT receipt_json FROM receipts {where} ORDER BY issued_at DESC LIMIT ?",
                 (*args, limit),
             ).fetchall()
         return [json.loads(r["receipt_json"]) for r in rows]
