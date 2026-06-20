@@ -1,5 +1,18 @@
 # Changelog — sm-arp
 
+## 0.2.3 — typed package, leaner wheel, enforced lint/types
+
+- **Ships `py.typed`** — `sm_arp` is now a PEP 561 typed package, so downstream
+  consumers (mypy/pyright) pick up its inline type hints with no stub workarounds.
+- **Leaner wheel** — the dev-only test subpackage (`sm_arp.tests`) is no longer
+  shipped in the published wheel; tests still run from source/editable in CI.
+- **Enforced lint + types** — CI now runs ruff (`E,F,I,UP,B,SIM,C4,RUF`),
+  `ruff format --check`, and mypy `--strict` over `sm_arp/`.
+- Added `examples/full_set_demo.py` — a runnable end-to-end demonstration of the
+  full ARP/VRP set (pricing, Ed25519 signing, hash-chained receipts, corroboration,
+  nanda-rep scoring + collusion severance, behavioral Merkle root, the
+  `verifiable_receipts` facet, and attestation).
+
 ## 0.2.2 — commitment_* category consistency
 
 The `commitment_entered` / `commitment_fulfilled` / `commitment_breached` action
