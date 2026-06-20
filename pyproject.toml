@@ -64,6 +64,9 @@ Repository = "https://github.com/Sharathvc23/sm-arp"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["sm_arp*"]
+# Tests are dev-only; keep them out of the consumable wheel (they still run from
+# the source tree / editable install in CI).
+exclude = ["sm_arp.tests*"]
 
 # Ship the PEP 561 `py.typed` marker so downstream consumers see `sm_arp`'s
 # inline type hints (without it, mypy treats the installed package as untyped).
