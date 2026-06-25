@@ -1,5 +1,22 @@
 # Changelog — sm-arp
 
+## Unreleased
+
+- **DAT bridge (§4.5 / DAT SPEC §9.1).** An `authority_granted` receipt can now
+  reference a Delegated Authority Token instead of inlining a flat scope:
+  - `dat_digest(dat)` — canonical SHA-256 over the signed DAT envelope, the value
+    a receipt commits to so the cheap on-network grant and the rich off-ledger DAT
+    cannot be separated or swapped.
+  - `dat_grant_payload(dat)` — builds the `authority_granted` `machine_payload`
+    carrying both the DAT reference (`dat_grant_id` + `dat_digest`) and the thin
+    fields (`granted_scope` / `grant_expires_at` / `granted_to_did`), so DAT-unaware
+    verifiers still work.
+  - `verify_authority_chain(..., *, dats=None, dat_verifier=None)` — opt-in hooks
+    that verify the digest commitment, check `granted_scope` agrees with the DAT's
+    categories, and delegate rich constraint evaluation to an injected
+    `dat_verifier` (sm-arp never imports sm-dat). Passing neither preserves exact
+    pre-bridge behaviour. Backward compatible.
+
 ## 0.2.3 — typed package, leaner wheel, enforced lint/types
 
 - **Ships `py.typed`** — `sm_arp` is now a PEP 561 typed package, so downstream

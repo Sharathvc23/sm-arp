@@ -15,6 +15,7 @@ import base64
 import hashlib
 import re
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -194,8 +195,59 @@ def verify_signature(r: dict[str, Any]) -> VerifyResult:
     return VerifyResult.accepted()
 
 
-def verify_authority_chain(r: dict[str, Any], grants: dict[str, dict[str, Any]]) -> VerifyResult:
-    """Strict §4.5 check of ``action.granted_by_receipt_id`` against a grant index."""
+def dat_digest(dat: dict[str, Any]) -> str:
+    """Canonical SHA-256 over the full *signed* DAT envelope — the value an
+    ``authority_granted`` receipt commits to when it references a Delegated
+    Authority Token (DAT SPEC §9.1).
+
+    sm-arp (which commits to the digest) and sm-dat (which presents the DAT)
+    compute it identically, so the cheap on-network receipt and the rich
+    off-ledger grant cannot be separated or swapped.
+    """
+    return "sha256:" + hashlib.sha256(canonical_bytes(dat, include_signature=True)).hexdigest()
+
+
+def dat_grant_payload(dat: dict[str, Any]) -> dict[str, Any]:
+    """Build the ``machine_payload`` for an ``authority_granted`` receipt that
+    references a DAT. Carries both the DAT reference (``dat_grant_id`` +
+    ``dat_digest``) *and* the thin fields (``granted_scope`` /
+    ``grant_expires_at`` / ``granted_to_did``), so a DAT-unaware verifier still
+    works and a DAT-aware one can resolve and richly evaluate the grant.
+    """
+    return {
+        "dat_grant_id": dat["grant_id"],
+        "dat_digest": dat_digest(dat),
+        "granted_to_did": dat["grantee_did"],
+        "granted_scope": list(dat["scope"]["action_categories"]),
+        "grant_expires_at": dat["not_after"],
+    }
+
+
+def verify_authority_chain(
+    r: dict[str, Any],
+    grants: dict[str, dict[str, Any]],
+    *,
+    dats: dict[str, dict[str, Any]] | None = None,
+    dat_verifier: Callable[[dict[str, Any], dict[str, Any]], VerifyResult] | None = None,
+) -> VerifyResult:
+    """Strict §4.5 check of ``action.granted_by_receipt_id`` against a grant index.
+
+    The thin path (default) checks the ``authority_granted`` receipt's
+    ``granted_scope`` / ``grant_expires_at`` / ``granted_to_did``. When a grant
+    references a DAT (DAT SPEC §9.1) and the caller opts in via ``dats`` and/or
+    ``dat_verifier``, the bridge additionally:
+
+    * verifies the receipt's committed ``dat_digest`` matches the presented DAT
+      (integrity — the grant cannot be swapped),
+    * checks ``granted_scope`` agrees with the DAT's ``scope.action_categories``
+      (consistency — they cannot drift),
+    * delegates the rich constraint evaluation (amount caps, budgets, attenuation)
+      to ``dat_verifier(dat, receipt)`` — sm-arp never imports sm-dat; the
+      verifier is injected.
+
+    Passing neither ``dats`` nor ``dat_verifier`` preserves the exact pre-bridge
+    behaviour.
+    """
     gid = r["action"].get("granted_by_receipt_id")
     if not gid:
         return VerifyResult.accepted()  # standing authority; nothing to check
@@ -218,6 +270,27 @@ def verify_authority_chain(r: dict[str, Any], grants: dict[str, dict[str, Any]])
         )
     if mp.get("granted_to_did") not in (None, r["issuer_did"]):
         return VerifyResult(False, "authority_chain", "issuer is not the grantee")
+
+    # DAT bridge (opt-in) — resolve and richly evaluate a referenced DAT.
+    dat_grant_id = mp.get("dat_grant_id")
+    if dat_grant_id and (dats is not None or dat_verifier is not None):
+        dat = (dats or {}).get(dat_grant_id)
+        if dat is None:
+            return VerifyResult(
+                False, "authority_chain", f"DAT {dat_grant_id} referenced but not provided"
+            )
+        if mp.get("dat_digest") != dat_digest(dat):
+            return VerifyResult(
+                False, "authority_chain", "dat_digest does not match the referenced DAT"
+            )
+        dat_cats = set(dat.get("scope", {}).get("action_categories", []))
+        if scope and dat_cats and set(scope) != dat_cats:
+            return VerifyResult(False, "authority_chain", "granted_scope disagrees with DAT scope")
+        if dat_verifier is not None:
+            res = dat_verifier(dat, r)
+            if not res.ok:
+                return res
+
     return VerifyResult.accepted()
 
 
