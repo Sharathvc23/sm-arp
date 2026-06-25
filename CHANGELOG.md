@@ -1,6 +1,6 @@
 # Changelog — sm-arp
 
-## Unreleased
+## 0.3.0 — DAT bridge
 
 - **DAT bridge (§4.5 / DAT SPEC §9.1).** An `authority_granted` receipt can now
   reference a Delegated Authority Token instead of inlining a flat scope:
