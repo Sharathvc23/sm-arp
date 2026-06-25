@@ -285,9 +285,7 @@ def verify_authority_chain(
             )
         dat_cats = set(dat.get("scope", {}).get("action_categories", []))
         if scope and dat_cats and set(scope) != dat_cats:
-            return VerifyResult(
-                False, "authority_chain", "granted_scope disagrees with DAT scope"
-            )
+            return VerifyResult(False, "authority_chain", "granted_scope disagrees with DAT scope")
         if dat_verifier is not None:
             res = dat_verifier(dat, r)
             if not res.ok:

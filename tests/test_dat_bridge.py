@@ -56,7 +56,8 @@ def action_receipt(grant_id: str) -> dict[str, Any]:
         AGENT,
         principal_did=HUMAN.did,
         action=build_action(
-            category="purchase", human_summary="2 tickets",
+            category="purchase",
+            human_summary="2 tickets",
             granted_by_receipt_id=grant_id,
         ),
     )
@@ -117,9 +118,13 @@ def test_scope_disagreement_rejected():
     mp = dat_grant_payload(dat)
     mp["granted_scope"] = ["purchase", "payment_sent"]  # disagrees with DAT's ["purchase"]
     g = issue_receipt(
-        HUMAN, principal_did=HUMAN.did,
-        action=build_action(category="authority_granted",
-                            human_summary="Granted, scope tampered.", machine_payload=mp),
+        HUMAN,
+        principal_did=HUMAN.did,
+        action=build_action(
+            category="authority_granted",
+            human_summary="Granted, scope tampered.",
+            machine_payload=mp,
+        ),
     )
     r = action_receipt(g["receipt_id"])
     res = verify_authority_chain(r, {g["receipt_id"]: g}, dats={dat["grant_id"]: dat})
