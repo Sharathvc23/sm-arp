@@ -12,7 +12,8 @@ def _owner() -> Identity:
 def test_render_uses_date_and_summary() -> None:
     owner = _owner()
     receipt = issue_receipt(
-        owner, principal_did=owner.did,
+        owner,
+        principal_did=owner.did,
         action=build_action(category="authority_granted", human_summary="Publish your listing"),
     )
     line = render(receipt)
@@ -24,9 +25,12 @@ def test_render_uses_date_and_summary() -> None:
 def test_render_annotates_non_completed_outcome() -> None:
     owner = _owner()
     receipt = issue_receipt(
-        owner, principal_did=owner.did,
+        owner,
+        principal_did=owner.did,
         action=build_action(
-            category="data_shared", human_summary="Shared your profile", outcome="denied",
+            category="data_shared",
+            human_summary="Shared your profile",
+            outcome="denied",
         ),
     )
     assert render(receipt).endswith("(denied)")
