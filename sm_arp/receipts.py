@@ -63,6 +63,26 @@ def chain_link(receipt: dict[str, Any]) -> str:
     return f"sha256:{digest}"
 
 
+def render(receipt: dict[str, Any]) -> str:
+    """A one-line, human-readable rendering of a receipt: its date and the summary the
+    issuer wrote, plus the outcome when it is not a plain completion.
+
+    Domain-agnostic on purpose — ARP does not know what a receipt is *about*, so it
+    renders the issuer's own ``human_summary``. A domain layer can supply richer
+    phrasing; this is the consistent baseline every consumer can fall back to.
+    """
+    action = receipt.get("action")
+    action = action if isinstance(action, dict) else {}
+    summary = str(action.get("human_summary") or action.get("category") or "receipt")
+    outcome = str(action.get("outcome") or "completed")
+    issued = str(receipt.get("issued_at") or "")
+    date = issued[:10] if len(issued) >= 10 and issued[4:5] == "-" else issued
+    line = f"{date} — {summary}" if date else summary
+    if outcome != "completed":
+        line += f" ({outcome})"
+    return line
+
+
 def build_action(
     *,
     category: str,

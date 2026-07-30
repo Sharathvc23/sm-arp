@@ -1,5 +1,12 @@
 # Changelog — sm-arp
 
+## 0.3.1 — readable receipts
+
+- **`render(receipt) -> str`.** A one-line, human-readable rendering of any receipt —
+  its date, the issuer's `human_summary`, and the outcome when it is not a plain
+  completion. Domain-agnostic: ARP renders the summary the issuer wrote, and a domain
+  layer can supply richer phrasing on top. Gives every consumer a consistent baseline.
+
 ## 0.3.0 — DAT bridge
 
 - **DAT bridge (§4.5 / DAT SPEC §9.1).** An `authority_granted` receipt can now
