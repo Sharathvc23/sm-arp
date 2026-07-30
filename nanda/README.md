@@ -86,9 +86,10 @@ Apply to the generated trace:
 
 ```python
 import json
+
 trace = json.load(open("nanda_interaction_trace.json"))
 by_id = {r["receipt_id"]: r for r in trace}
-chain = walk_authority_chain(trace[-1], by_id)   # start at Receipt 3
+chain = walk_authority_chain(trace[-1], by_id)  # start at Receipt 3
 # chain[0]  → Receipt 3 (data_shared action)
 # chain[1]  → Receipt 2 (sub-delegation)
 # chain[2]  → Receipt 1 (genesis grant)

@@ -24,10 +24,13 @@ receipt envelope cannot drift between them. The library needs nothing but
 from sm_arp import Identity, build_action, issue_receipt, verify_receipt, IssuerLog
 
 me = Identity.generate()
-r = issue_receipt(me, principal_did=me.did,
-                  action=build_action(category="data_shared", human_summary="shared my calendar"))
-assert verify_receipt(r).ok                 # structure → signature → authority → hash chain
-IssuerLog("log.sqlite").append(r)           # SQLite Issuer/Agency Log, hash-chained per issuer
+r = issue_receipt(
+    me,
+    principal_did=me.did,
+    action=build_action(category="data_shared", human_summary="shared my calendar"),
+)
+assert verify_receipt(r).ok  # structure → signature → authority → hash chain
+IssuerLog("log.sqlite").append(r)  # SQLite Issuer/Agency Log, hash-chained per issuer
 ```
 
 `sm_arp`'s verifier is tested against the canonical 22-vector corpus and asserted
