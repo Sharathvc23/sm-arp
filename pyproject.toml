@@ -48,7 +48,7 @@ cli = [
 # the lint/type gates (ruff + mypy) that CI enforces.
 dev = [
     "pytest>=8.0",
-    "ruff>=0.6",
+    "ruff==0.15.13",
     "mypy>=1.8",
 ]
 
