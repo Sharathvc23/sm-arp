@@ -81,3 +81,7 @@ receipt format depends on nothing but Ed25519, JCS, and the W3C `did:key` method
 ## License
 
 MIT — see [LICENSE](./LICENSE).
+
+### Authenticated direct grants (0.3.3)
+
+Use `verify_direct_grant(action, grant, at=trusted_aware_datetime)` for an explicit single-category grant. It checks both issuer signatures, the ID link, principal, grantee, and validity at the supplied time. A referenced DAT requires its evidence and an injected verifier. Supply an independently trusted grant issuer and policy at the application boundary. For historical checks supply the independently evidenced execution time. The existing `verify_authority_chain` checks relationships against a caller-provided grant index. Preserve signed receipts as issued; append detached evidence outside them to preserve signatures and chain links.

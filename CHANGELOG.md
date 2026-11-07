@@ -1,4 +1,7 @@
 # Changelog — sm-arp
+n## 0.3.3
+
+Add opt-in authenticated direct-grant verification with explicit time and DAT evaluation. Existing receipt bytes and chain hashes are preserved.
 
 ## 0.3.1 — readable receipts
 
