@@ -28,6 +28,10 @@ def test_direct_grant_checks_both_signatures_time_and_scope():
     assert verify_direct_grant(action, grant, at=now).ok
     assert not verify_direct_grant(action, grant, at=now, require_dat=True).ok
     assert not verify_direct_grant(action, grant, at=datetime(2099, 1, 1, tzinfo=UTC)).ok
+    impersonation = issue_receipt(
+        agent, principal_did=owner.did, receipt_id=grant["receipt_id"], action=grant["action"]
+    )
+    assert not verify_direct_grant(action, impersonation, at=now).ok
     for item in (grant, action):
         forged = dict(item, signature="AA==")
         pair = (action, forged) if item is grant else (forged, grant)
