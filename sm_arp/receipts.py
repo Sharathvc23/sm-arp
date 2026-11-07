@@ -16,6 +16,7 @@ import hashlib
 import re
 import uuid
 from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -205,7 +206,7 @@ def verify_signature(r: dict[str, Any]) -> VerifyResult:
     except Exception as e:
         return VerifyResult(False, "signature", f"unresolvable issuer_did: {e}")
     try:
-        sig = base64.b64decode(r["signature"])
+        sig = base64.b64decode(r["signature"], validate=True)
     except Exception as e:
         return VerifyResult(False, "signature", f"signature not base64: {e}")
     try:
@@ -373,6 +374,9 @@ def verify_direct_grant(
     try:
         if at.utcoffset() is None:
             return failure
+        action, grant = deepcopy(action), deepcopy(grant)
+        if action["receipt_id"] == grant["receipt_id"]:
+            return failure
         for item in (grant, action):
             verified = verify_receipt(item)
             if not verified.ok:
@@ -396,7 +400,12 @@ def verify_direct_grant(
         if not (start <= issued <= at < end):
             return failure
         if require_dat or "dat_grant_id" in payload or "dat_digest" in payload:
-            dat = (dats or {}).get(payload.get("dat_grant_id"))
+            dat_id = payload.get("dat_grant_id")
+            if not isinstance(dat_id, str) or not dat_id:
+                return failure
+            dat = deepcopy((dats or {}).get(dat_id))
+            if not dat or dat.get("grant_id") != dat_id:
+                return failure
             if not dat or dat_verifier is None or dat_digest(dat) != payload.get("dat_digest"):
                 return failure
             if dat["scope"]["action_categories"] != payload["granted_scope"]:
