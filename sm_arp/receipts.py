@@ -357,3 +357,53 @@ def verify_receipt(
         if not hc.ok:
             return hc
     return VerifyResult.accepted()
+
+
+def verify_direct_grant(
+    action: dict[str, Any],
+    grant: dict[str, Any],
+    *,
+    at: datetime,
+    dats: dict[str, dict[str, Any]] | None = None,
+    dat_verifier: Callable[[dict[str, Any], dict[str, Any]], VerifyResult] | None = None,
+    require_dat: bool = False,
+) -> VerifyResult:
+    """Authenticate both receipts and evaluate one direct grant at a trusted instant."""
+    failure = VerifyResult(False, "authority_chain", "invalid direct grant or validity interval")
+    try:
+        if at.utcoffset() is None:
+            return failure
+        for item in (grant, action):
+            verified = verify_receipt(item)
+            if not verified.ok:
+                return verified
+            if not _UUID_V4_RE.fullmatch(item["receipt_id"]):
+                return failure
+        payload = grant["action"]["machine_payload"]
+        if (
+            grant["action"]["category"] != "authority_granted"
+            or grant["action"]["outcome"] != "completed"
+            or action["action"].get("granted_by_receipt_id") != grant["receipt_id"]
+            or grant["principal_did"] != action["principal_did"]
+            or payload.get("granted_to_did") != action["issuer_did"]
+            or payload.get("granted_scope") != [action["action"]["category"]]
+        ):
+            return failure
+        start, issued, end = (
+            datetime.fromisoformat(stamp)
+            for stamp in (grant["issued_at"], action["issued_at"], payload["grant_expires_at"])
+        )
+        if not (start <= issued <= at < end):
+            return failure
+        if require_dat or "dat_grant_id" in payload or "dat_digest" in payload:
+            dat = (dats or {}).get(payload.get("dat_grant_id"))
+            if not dat or dat_verifier is None or dat_digest(dat) != payload.get("dat_digest"):
+                return failure
+            if dat["scope"]["action_categories"] != payload["granted_scope"]:
+                return failure
+            result = dat_verifier(dat, action)
+            if not isinstance(result, VerifyResult) or result.ok is not True:
+                return failure
+    except (ValueError, TypeError, KeyError, AttributeError, OverflowError, RecursionError):
+        return failure
+    return VerifyResult.accepted()
