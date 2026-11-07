@@ -1,5 +1,10 @@
 # Changelog — sm-arp
-n## 0.3.3
+
+## 0.3.4
+
+Direct grants require the named principal to sign the grant receipt.
+
+## 0.3.3
 
 Add opt-in authenticated direct-grant verification with explicit time and DAT evaluation. Existing receipt bytes and chain hashes are preserved.
 

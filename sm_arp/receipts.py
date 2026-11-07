@@ -388,6 +388,7 @@ def verify_direct_grant(
             grant["action"]["category"] != "authority_granted"
             or grant["action"]["outcome"] != "completed"
             or action["action"].get("granted_by_receipt_id") != grant["receipt_id"]
+            or grant["issuer_did"] != grant["principal_did"]
             or grant["principal_did"] != action["principal_did"]
             or payload.get("granted_to_did") != action["issuer_did"]
             or payload.get("granted_scope") != [action["action"]["category"]]
