@@ -32,3 +32,27 @@ def test_direct_grant_checks_both_signatures_time_and_scope():
         forged = dict(item, signature="AA==")
         pair = (action, forged) if item is grant else (forged, grant)
         assert not verify_direct_grant(*pair, at=now).ok
+
+
+def test_self_reference_and_noncanonical_signature():
+    from sm_arp import new_receipt_id, verify_signature
+
+    owner = Identity.generate()
+    rid = new_receipt_id()
+    receipt = issue_receipt(
+        owner,
+        principal_did=owner.did,
+        receipt_id=rid,
+        action=build_action(
+            category="authority_granted",
+            human_summary="self",
+            granted_by_receipt_id=rid,
+            machine_payload={
+                "granted_scope": ["authority_granted"],
+                "granted_to_did": owner.did,
+                "grant_expires_at": "2099-01-01T00:00:00Z",
+            },
+        ),
+    )
+    assert not verify_direct_grant(receipt, receipt, at=datetime.now(UTC)).ok
+    assert not verify_signature(dict(receipt, signature=receipt["signature"] + "!")).ok
