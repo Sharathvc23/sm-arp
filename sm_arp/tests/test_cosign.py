@@ -120,3 +120,39 @@ def test_did_key_helpers_roundtrip_and_agree_with_identity() -> None:
     did = did_key_from_pubkey(pub)
     assert did == did_from_sk(seed)  # pubkey-form agrees with the seed-form deriver
     assert pubkey_from_did_key(did) == pub  # exact inverse
+
+
+def test_signer_did_alias_is_accepted_when_reading() -> None:
+    """sm-oversight's quorum writes ``signer_did``; the spec's key is ``witness_did``.
+    Readers accept both (``witness_did`` wins when both are present); writers keep
+    emitting ``witness_did``."""
+    a, b = gen_key(), gen_key()
+    b_did = did_from_sk(b)
+    r = _receipt(did_from_sk(a), b_did)
+    entry = cosign_receipt(r, signing_key_bytes=b)
+    assert "witness_did" in entry and "signer_did" not in entry
+    r["evidence"] = {"witness_signatures": [{"signer_did": b_did, "signature": entry["signature"]}]}
+    assert is_corroborated(r) is True
+    # witness_did takes precedence: a wrong witness_did is not rescued by signer_did.
+    r["evidence"]["witness_signatures"] = [
+        {"witness_did": "did:key:zOther", "signer_did": b_did, "signature": entry["signature"]}
+    ]
+    assert is_corroborated(r) is False
+
+
+def test_corroboration_payload_is_the_issuer_signed_bytes() -> None:
+    """One detached-witness rule governs the issuer signature, the chain link and
+    corroboration: the bytes a counterparty signs ARE canonical_bytes(include_signature=False)."""
+    from sm_arp import Identity, canonical_bytes, issue_receipt
+    from sm_arp.receipts import build_action
+    from sm_arp.vrp import _corroboration_payload
+
+    issuer, cp = Identity.generate(), Identity.generate()
+    r = issue_receipt(
+        issuer,
+        principal_did=issuer.did,
+        action=build_action(category="purchase", human_summary="x", counterparty_did=cp.did),
+        evidence={"external_refs": ["X"]},
+    )
+    r["evidence"]["witness_signatures"] = [cosign_receipt(r, signing_key_bytes=cp.sk_bytes)]
+    assert _corroboration_payload(r) == canonical_bytes(r, include_signature=False)

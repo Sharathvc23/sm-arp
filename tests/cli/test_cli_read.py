@@ -55,6 +55,20 @@ def test_verify_missing_file_exits_2(runner, tmp_path):
     assert result.exit_code == 2
 
 
+def test_verify_rejects_unknown_mode_instead_of_degrading_to_tolerant(runner, vectors_dir):
+    result = runner.invoke(
+        app, ["verify", str(vectors_dir / "01-basic-purchase.json"), "--mode", "lenient"]
+    )
+    assert result.exit_code == 2
+    assert "unknown verifier mode" in strip_ansi(result.output)
+
+
+def test_verify_witnessed_receipt_passes(runner, vectors_dir):
+    result = runner.invoke(app, ["verify", str(vectors_dir / "23-witnessed-receipt.json")])
+    assert result.exit_code == 0
+    assert "accepted" in strip_ansi(result.output)
+
+
 def test_verify_tolerant_mode_accepts_negative_strict_case(runner, vectors_dir):
     # 22-unknown-category-tolerant passes both strict and tolerant; tolerant
     # mode should always at least accept it.
@@ -217,10 +231,10 @@ def test_render_show_crypto_exposes_dids(runner, nanda_trace, tmp_path):
 # ── arp vectors ────────────────────────────────────────────────────
 
 
-def test_vectors_list_shows_all_22(runner):
+def test_vectors_list_shows_all_25(runner):
     result = runner.invoke(app, ["vectors", "list"])
     assert result.exit_code == 0
-    assert "22 vector(s)" in strip_ansi(result.output)
+    assert "25 vector(s)" in strip_ansi(result.output)
 
 
 def test_vectors_list_positive_filter(runner):

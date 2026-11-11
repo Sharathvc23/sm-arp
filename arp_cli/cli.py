@@ -12,7 +12,7 @@ import typer
 from arp_cli import corpus, narrate
 from arp_cli import issue as _issue
 from arp_cli import render as _render
-from conformance.arp import compute_chain_link, verify_receipt
+from conformance.arp import VERIFIER_MODES, compute_chain_link, verify_receipt
 
 app = typer.Typer(
     name="arp",
@@ -74,6 +74,13 @@ def verify(
     previous_receipt_hash chain check. Auto-detects single vs. trace by
     inspecting the JSON root.
     """
+    if mode not in VERIFIER_MODES:
+        typer.secho(
+            f"error: unknown verifier mode {mode!r}; expected one of {', '.join(VERIFIER_MODES)}",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
     body = _load(file)
     receipts: list[dict] = body if isinstance(body, list) else [body]
 

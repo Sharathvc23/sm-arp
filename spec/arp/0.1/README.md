@@ -27,14 +27,14 @@ As agents move from chat-only assistants to systems that purchase, file, decide,
 | `governance.md` | Stewardship, change process, and the path to public publication. |
 | `CHANGELOG.md` | Per-version history. |
 | `../../schema/arp/0.1/` | JSON Schemas (Draft 2020-12) for the receipt envelope. |
-| `../../vectors/arp/0.1/` | 22 language-agnostic golden receipt vectors. |
+| `../../vectors/arp/0.1/` | 25 language-agnostic golden receipt vectors. |
 | `../../conformance/arp/` | Reference Python conformance harness that executes the vectors. |
 
 ## Status of v0.1
 
 - **Spec:** Complete draft. Reviewable.
 - **Schemas:** Complete draft.
-- **Vectors:** 22 vectors covering core action categories, hash-chain semantics, negative cases, and edge cases.
+- **Vectors:** 25 vectors covering core action categories, hash-chain semantics, negative cases, and edge cases.
 - **Conformance harness:** `conformance/arp/test_arp_v01.py` — framework-agnostic; any runtime in any language passes the same vectors.
 
 This protocol is **published-spec-first** via [labs.stellarminds.ai/arp](https://labs.stellarminds.ai/arp), not submitted to an external standards body. The signed conformance badge is produced by [`sm-conformance`](https://github.com/Sharathvc23/sm-conformance); see `governance.md` for the path to publication.

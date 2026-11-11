@@ -1,6 +1,7 @@
 """ARP v0.1 receipts — build, sign, and verify per ``spec/arp/0.1``.
 
-* canonicalise the body sans-``signature`` with RFC 8785 JCS,
+* canonicalise the body sans-``signature`` and sans the detached witness
+  evidence (``evidence.witness_signatures``) with RFC 8785 JCS,
 * sign the canonical bytes with the issuer's Ed25519 key,
 * attach a standard-base64 (padded) signature.
 
@@ -51,15 +52,49 @@ def now_iso() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def detach_witnesses(receipt: dict[str, Any]) -> dict[str, Any]:
+    """A shallow-enough copy of ``receipt`` with ``evidence.witness_signatures``
+    removed (§5, §6.1). An ``evidence`` object left empty by the removal is dropped
+    too, so a receipt that carried *only* witnesses canonicalises to the same
+    bytes as one that never had an ``evidence`` member.
+
+    Witness co-signatures are *detached evidence*: third parties append them
+    after the issuer signed, so they are outside the issuer's signature and
+    outside the hash chain. This is the single rule every ARP byte-commitment
+    shares — the issuer signature, the chain link, and the VRP corroboration
+    payload — so a witness appended later never invalidates the issuer or moves
+    the chain. The input is never mutated.
+    """
+    body = dict(receipt)
+    evidence = body.get("evidence")
+    if isinstance(evidence, dict) and "witness_signatures" in evidence:
+        evidence = {k: v for k, v in evidence.items() if k != "witness_signatures"}
+        if evidence:
+            body["evidence"] = evidence
+        else:
+            del body["evidence"]
+    return body
+
+
 def canonical_bytes(receipt: dict[str, Any], *, include_signature: bool) -> bytes:
-    """JCS-canonical bytes of a receipt, with or without the signature field."""
-    body = {k: v for k, v in receipt.items() if include_signature or k != "signature"}
+    """JCS-canonical bytes of a receipt, with or without the ``signature`` field.
+
+    ``evidence.witness_signatures`` is always detached (see :func:`detach_witnesses`):
+    ``include_signature=False`` yields the bytes the issuer signs (§6.1) and
+    ``include_signature=True`` the bytes the hash chain links (§6.4).
+    """
+    body = detach_witnesses(receipt)
+    if not include_signature:
+        body.pop("signature", None)
     # jcs is untyped (no py.typed); canonicalize returns bytes at runtime.
     return cast(bytes, jcs.canonicalize(body))
 
 
 def chain_link(receipt: dict[str, Any]) -> str:
-    """``sha256:<hex>`` over the JCS bytes of a *signed* receipt (§6.4)."""
+    """``sha256:<hex>`` over the JCS bytes of a *signed* receipt (§6.4) — the
+    issuer-signed body *including* its ``signature`` and *excluding* the detached
+    ``evidence.witness_signatures``, so a witness appended after issuance does not
+    change the link a successor receipt already committed to."""
     digest = hashlib.sha256(canonical_bytes(receipt, include_signature=True)).hexdigest()
     return f"sha256:{digest}"
 
@@ -176,6 +211,21 @@ _REQUIRED_TOP = (
     "action",
     "signature",
 )
+# §3.2 — every optional top-level member a v0.1 receipt may carry. Anything else at
+# the top level is an unknown member: §3 says a strict verifier MUST reject it (the
+# `extensions` object is the sanctioned carrier for additions), a tolerant one MAY
+# keep it. Mirrors `additionalProperties: false` in schema/arp/0.1/receipt.schema.json.
+_OPTIONAL_TOP = (
+    "authority_chain",
+    "evidence",
+    "previous_receipt_hash",
+    "jurisdiction",
+    "accessibility",
+    "extensions",
+)
+KNOWN_TOP_LEVEL_MEMBERS = frozenset(_REQUIRED_TOP + _OPTIONAL_TOP)
+
+VERIFIER_MODES = ("strict", "tolerant")
 
 
 def _check_structure(r: dict[str, Any], *, strict: bool) -> VerifyResult | None:
@@ -184,9 +234,15 @@ def _check_structure(r: dict[str, Any], *, strict: bool) -> VerifyResult | None:
     for field in _REQUIRED_TOP:
         if field not in r:
             return VerifyResult(False, "structure", f"missing required field {field!r}")
+    if strict:
+        unknown = sorted(k for k in r if k not in KNOWN_TOP_LEVEL_MEMBERS)
+        if unknown:
+            return VerifyResult(False, "structure", f"unknown top-level member(s) {unknown}")
     if r["version"] != ARP_VERSION:
         return VerifyResult(False, "structure", f"unexpected version {r['version']!r}")
     action = r["action"]
+    if not isinstance(action, dict):
+        return VerifyResult(False, "structure", "action is not an object")
     for field in ("category", "human_summary", "outcome"):
         if field not in action:
             return VerifyResult(False, "structure", f"action missing {field!r}")
@@ -214,6 +270,20 @@ def verify_signature(r: dict[str, Any]) -> VerifyResult:
     except InvalidSignature:
         return VerifyResult(False, "signature", "Ed25519 signature does not verify")
     return VerifyResult.accepted()
+
+
+def _parse_rfc3339(value: object) -> datetime | None:
+    """An aware ``datetime`` for an RFC 3339 timestamp string, or ``None`` when
+    ``value`` is not a string, does not parse, or carries no UTC offset. Naive
+    timestamps are rejected: comparing them against aware ones is undefined, and
+    §3.1 requires the ``Z`` suffix anyway."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.utcoffset() is not None else None
 
 
 def dat_digest(dat: dict[str, Any]) -> str:
@@ -266,8 +336,17 @@ def verify_authority_chain(
       to ``dat_verifier(dat, receipt)`` — sm-arp never imports sm-dat; the
       verifier is injected.
 
+    The grant itself is authenticated, not merely looked up: its Ed25519
+    signature must verify under its own ``issuer_did``, the index key must equal
+    its ``receipt_id``, ``granted_to_did`` must be present and equal the action's
+    ``issuer_did``, and ``grant_expires_at`` must be a well-formed RFC 3339
+    timestamp that is later than the action's ``issued_at`` (an absent or
+    unparseable expiry fails — a grant without an expiry is not "forever", it is
+    malformed). A grant index entry is caller-supplied data; this function trusts
+    none of it beyond what the grant's own signature proves.
+
     Passing neither ``dats`` nor ``dat_verifier`` preserves the exact pre-bridge
-    behaviour.
+    DAT behaviour.
     """
     gid = r["action"].get("granted_by_receipt_id")
     if not gid:
@@ -275,21 +354,44 @@ def verify_authority_chain(
     grant = grants.get(gid)
     if grant is None:
         return VerifyResult(False, "authority_chain", f"grant {gid} not found")
-    if grant["principal_did"] != r["principal_did"]:
+    if not isinstance(grant, dict) or not isinstance(grant.get("action"), dict):
+        return VerifyResult(False, "authority_chain", f"grant {gid} is not a receipt object")
+    if grant.get("receipt_id") != gid:
+        return VerifyResult(
+            False, "authority_chain", f"grant index key {gid} does not match grant receipt_id"
+        )
+    grant_sig = verify_signature(grant)
+    if not grant_sig.ok:
+        return VerifyResult(False, "authority_chain", f"grant {gid} signature: {grant_sig.detail}")
+    if grant.get("principal_did") != r["principal_did"]:
         return VerifyResult(False, "authority_chain", "principal mismatch with grant")
-    if grant["action"]["category"] != "authority_granted":
+    if grant["action"].get("category") != "authority_granted":
         return VerifyResult(False, "authority_chain", f"{gid} is not an authority_granted receipt")
-    mp = grant["action"].get("machine_payload", {})
-    expires = mp.get("grant_expires_at", "")
-    if expires and expires <= r["issued_at"]:
-        return VerifyResult(False, "authority_chain", f"grant expired ({expires})")
-    scope = mp.get("granted_scope", [])
+    mp = grant["action"].get("machine_payload")
+    if not isinstance(mp, dict):
+        return VerifyResult(False, "authority_chain", f"grant {gid} has no machine_payload")
+    expires = _parse_rfc3339(mp.get("grant_expires_at"))
+    if expires is None:
+        return VerifyResult(
+            False, "authority_chain", "grant_expires_at missing or not an RFC 3339 timestamp"
+        )
+    issued = _parse_rfc3339(r["issued_at"])
+    if issued is None:
+        return VerifyResult(False, "authority_chain", "issued_at is not an RFC 3339 timestamp")
+    if expires <= issued:
+        return VerifyResult(False, "authority_chain", f"grant expired ({mp['grant_expires_at']})")
+    scope = mp.get("granted_scope")
+    if not isinstance(scope, list) or not scope:
+        return VerifyResult(False, "authority_chain", "granted_scope missing or empty")
     cat = r["action"]["category"]
     if cat not in scope and "*" not in scope:
         return VerifyResult(
             False, "authority_chain", f"category {cat!r} outside grant scope {scope}"
         )
-    if mp.get("granted_to_did") not in (None, r["issuer_did"]):
+    grantee = mp.get("granted_to_did")
+    if not isinstance(grantee, str) or not grantee:
+        return VerifyResult(False, "authority_chain", "granted_to_did missing")
+    if grantee != r["issuer_did"]:
         return VerifyResult(False, "authority_chain", "issuer is not the grantee")
 
     # DAT bridge (opt-in) — resolve and richly evaluate a referenced DAT.
@@ -341,7 +443,18 @@ def verify_receipt(
     prior: dict[str, Any] | None = None,
     check_chain: bool = False,
 ) -> VerifyResult:
-    """Full verification: structure → signature → authority → hash chain."""
+    """Verify a receipt: structure → signature, then the opt-in stages.
+
+    By default only the structural envelope (§3) and the issuer's Ed25519
+    signature (§6.3) are checked. The authority chain (§4.5) is checked only when
+    a ``grants`` index is supplied, and the hash chain (§6.4) only when
+    ``check_chain=True`` (with ``prior`` being the predecessor, or ``None`` for a
+    genesis receipt). ``mode`` is ``"strict"`` (default) or ``"tolerant"``; any
+    other value is a programming error and raises ``ValueError`` rather than
+    silently weakening verification.
+    """
+    if mode not in VERIFIER_MODES:
+        raise ValueError(f"unknown verifier mode {mode!r}; expected one of {VERIFIER_MODES}")
     strict = mode == "strict"
     structural = _check_structure(r, strict=strict)
     if structural is not None:

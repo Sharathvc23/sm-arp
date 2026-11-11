@@ -1,0 +1,47 @@
+{
+  "id": "23-witnessed-receipt",
+  "description": "Counterparty + third-party witness co-signatures appended after issuance. Witnesses are detached evidence: the issuer signature still verifies, and the counterparty entry corroborates the receipt (VRP §A).",
+  "spec_ref": "spec.md §5, §6.1, §6.4",
+  "expected_outcome": "verify_pass",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE=",
+    "counterparty": "YXJwLXZlY3Rvci1jb3VudGVycGFydHktc2VlZDMyYiE=",
+    "witness": "YXJwLXZlY3Rvci13aXRuZXNzLXNlZWQtMzJieXRlcyE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "07070707-0707-4707-8707-070707070707",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T20:45:00Z",
+    "action": {
+      "category": "purchase",
+      "human_summary": "Paid Toscanini's $9.50 for two scoops; the shop's agent co-signed.",
+      "outcome": "completed",
+      "counterparty_did": "did:key:z6MkkjfwJUSqmSB49ZaMWLuwPtmn9X4ZnZ4B6yPnfDE5cXKp",
+      "counterparty_label": "Toscanini's Ice Cream",
+      "amount": {
+        "currency": "USD",
+        "cents": -950
+      }
+    },
+    "evidence": {
+      "external_refs": [
+        "TOSC-20260521-0042"
+      ],
+      "witness_signatures": [
+        {
+          "witness_did": "did:key:z6MkkjfwJUSqmSB49ZaMWLuwPtmn9X4ZnZ4B6yPnfDE5cXKp",
+          "signature": "6h+W5wT15nMFgofcnn1LyaB49DD2i9NR6VPSe7U9ydXjpg99pnoEbazlK20MPYOptFJRhRRJUIh4dKxgRN4xCg=="
+        },
+        {
+          "witness_did": "did:key:z6Mkjkc5ifoR3JdqJbc7sVsStbTjq6eSDKBz91oiSETHNcEF",
+          "signature": "mu52IGc6GPn8EFRuE7QkQt7FVN7s+bgtpJKdKkPNMXhLz0u1oFXthNU+UjNeRShueksO5cAqBNJ1KOGDIdakDA=="
+        }
+      ]
+    },
+    "signature": "qz5j1IwuMHLSI9yZX4H6PAZsnq3sH3NQgq0CCfEgoJfU5jNO3Gc0Ml6f2yTHi5Fe5ciKEw8OjLG2BxFtVUrnDQ=="
+  }
+}

@@ -61,7 +61,7 @@ standards-body submission is planned for v0.1.
 
 | Stage | Milestone |
 |---|---|
-| **Working draft** (now) | v0.1 spec + schemas + 22 receipt vectors + conformance harness |
+| **Working draft** (now) | v0.1 spec + schemas + 25 receipt vectors + conformance harness |
 | **Public publication** | `labs.stellarminds.ai/arp` resolves here; the conformance registry accepts external submissions |
 | **Adoption** | Independent agent runtimes implement ARP, pass the conformance program, appear in the registry |
 

@@ -83,20 +83,47 @@ def did_key_from_pubkey(pk_bytes: bytes) -> str:
     return "did:key:z" + base58.b58encode(prefixed).decode("ascii")
 
 
+def detach_witnesses(receipt: dict) -> dict:
+    """The receipt without ``evidence.witness_signatures`` (spec §5, §6.1) — witness
+    co-signatures are detached evidence, outside the issuer signature and the hash
+    chain. An ``evidence`` object left empty is dropped. Never mutates its input."""
+    body = dict(receipt)
+    evidence = body.get("evidence")
+    if isinstance(evidence, dict) and "witness_signatures" in evidence:
+        evidence = {k: v for k, v in evidence.items() if k != "witness_signatures"}
+        if evidence:
+            body["evidence"] = evidence
+        else:
+            del body["evidence"]
+    return body
+
+
+def signing_bytes(receipt: dict) -> bytes:
+    """The JCS bytes the issuer signs (spec §6.1): sans ``signature``, witnesses
+    detached. Also the bytes a witness co-signs (VRP §A), so one rule governs."""
+    body = detach_witnesses(receipt)
+    body.pop("signature", None)
+    return jcs.canonicalize(body)
+
+
 def sign_receipt(sk: Ed25519PrivateKey, receipt: dict) -> dict:
-    """JCS-canonicalize the receipt sans-signature, Ed25519-sign, attach b64 sig."""
-    body = {k: v for k, v in receipt.items() if k != "signature"}
-    canonical = jcs.canonicalize(body)
-    sig_bytes = sk.sign(canonical)
+    """JCS-canonicalize the receipt per §6.1, Ed25519-sign, attach b64 sig."""
+    sig_bytes = sk.sign(signing_bytes(receipt))
     assert len(sig_bytes) == 64
     receipt["signature"] = base64.b64encode(sig_bytes).decode("ascii")
     return receipt
 
 
+def witness_entry(sk: Ed25519PrivateKey, witness_did: str, receipt: dict) -> dict:
+    """A detached ``evidence.witness_signatures`` entry over the §6.1 bytes."""
+    sig_bytes = sk.sign(signing_bytes(receipt))
+    return {"witness_did": witness_did, "signature": base64.b64encode(sig_bytes).decode("ascii")}
+
+
 def receipt_hash_chain_link(receipt: dict) -> str:
-    """sha256: hash of the full canonical receipt (including signature) — input to
-    the next receipt's previous_receipt_hash."""
-    canonical = jcs.canonicalize(receipt)
+    """sha256: hash of the canonical receipt including its signature, witnesses
+    detached (spec §6.4) — input to the next receipt's previous_receipt_hash."""
+    canonical = jcs.canonicalize(detach_witnesses(receipt))
     digest = hashlib.sha256(canonical).hexdigest()
     return f"sha256:{digest}"
 
@@ -121,6 +148,15 @@ def keys_b64() -> dict:
     }
 
 
+def witness_keys_b64() -> dict:
+    """Seeds of the two co-signers in the witnessed vectors (23, 24), so a verifier
+    can rebuild or vary their detached co-signatures."""
+    return {
+        "counterparty": base64.b64encode(COUNTERPARTY_SEED).decode("ascii"),
+        "witness": base64.b64encode(WITNESS_SEED).decode("ascii"),
+    }
+
+
 # ── vector builders ────────────────────────────────────────────────
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent.parent / "vectors" / "arp" / "0.1"
@@ -133,6 +169,7 @@ def emit(
     expected_outcome: str,
     receipt: dict,
     verifier_mode: str = "strict",
+    extra_keys: dict | None = None,
 ) -> None:
     path = OUTPUT_DIR / f"{name}.json"
     body = {
@@ -141,7 +178,7 @@ def emit(
         "spec_ref": spec_ref,
         "expected_outcome": expected_outcome,
         "verifier_mode": verifier_mode,
-        "private_keys": keys_b64(),
+        "private_keys": {**keys_b64(), **(extra_keys or {})},
         "receipt": receipt,
     }
     path.write_text(json.dumps(body, indent=2, ensure_ascii=False) + "\n")
@@ -729,6 +766,92 @@ def vector_22_unknown_category_tolerant() -> None:
     )
 
 
+def _witnessed_receipt(*, receipt_id: str, issued_at: str) -> dict:
+    """An issuer-signed purchase (the shape vectors 23 and 24 share) that the
+    counterparty corroborates and an unrelated witness co-signs, both AFTER issuance."""
+    r = base_receipt(
+        receipt_id=receipt_id,
+        issued_at=issued_at,
+        category="purchase",
+        human_summary="Paid Toscanini's $9.50 for two scoops; the shop's agent co-signed.",
+    )
+    r["action"]["counterparty_did"] = COUNTERPARTY_DID
+    r["action"]["counterparty_label"] = "Toscanini's Ice Cream"
+    r["action"]["amount"] = {"currency": "USD", "cents": -950}
+    r["evidence"] = {"external_refs": ["TOSC-20260521-0042"]}
+    sign_receipt(ISSUER_SK, r)
+    # Witnesses are appended to an already-signed receipt — the issuer signature
+    # computed above MUST keep verifying (spec §5, §6.1: detached witness evidence).
+    r["evidence"]["witness_signatures"] = [
+        witness_entry(COUNTERPARTY_SK, COUNTERPARTY_DID, r),
+        witness_entry(WITNESS_SK, WITNESS_DID, r),
+    ]
+    return r
+
+
+def vector_23_witnessed_receipt() -> None:
+    """Witness co-signatures appended after issuance leave the issuer signature valid."""
+    r = _witnessed_receipt(
+        receipt_id="07070707-0707-4707-8707-070707070707", issued_at="2026-05-21T20:45:00Z"
+    )
+    emit(
+        "23-witnessed-receipt",
+        "Counterparty + third-party witness co-signatures appended after issuance. "
+        "Witnesses are detached evidence: the issuer signature still verifies, and the "
+        "counterparty entry corroborates the receipt (VRP §A).",
+        "spec.md §5, §6.1, §6.4",
+        "verify_pass",
+        r,
+        extra_keys=witness_keys_b64(),
+    )
+
+
+def vector_24_witness_tampered() -> None:
+    """A tampered witness entry does not touch the issuer signature — but no longer
+    corroborates (the counterparty's co-signature no longer verifies)."""
+    r = _witnessed_receipt(
+        receipt_id="09090909-0909-4909-8909-090909090909", issued_at="2026-05-21T20:50:00Z"
+    )
+    counterparty_entry = r["evidence"]["witness_signatures"][0]
+    assert counterparty_entry["witness_did"] == COUNTERPARTY_DID
+    # Flip the first byte of the counterparty's co-signature.
+    sig = bytearray(base64.b64decode(counterparty_entry["signature"]))
+    sig[0] ^= 0xFF
+    counterparty_entry["signature"] = base64.b64encode(bytes(sig)).decode("ascii")
+    emit(
+        "24-witness-tampered",
+        "Counterparty co-signature tampered after the fact. The issuer signature still "
+        "verifies (witnesses are outside it) but the receipt is NOT corroborated: "
+        "is_corroborated MUST be false. Tampering a witness breaks only that witness.",
+        "spec.md §5, §6.1; VRP §A",
+        "verify_pass",
+        r,
+        extra_keys=witness_keys_b64(),
+    )
+
+
+def vector_25_unknown_top_level_member() -> None:
+    """An unknown top-level member MUST be rejected by a strict verifier (§3) even
+    though the issuer signed over it — `extensions` is the carrier for additions."""
+    r = base_receipt(
+        receipt_id="08080808-0808-4808-8808-080808080808",
+        issued_at="2026-05-21T21:00:00Z",
+        category="message_sent",
+        human_summary="A message carrying an unknown top-level member instead of an extension.",
+    )
+    r["workflow_id"] = "WF-12345"  # should have been extensions["acme.example.workflow-id"]
+    sign_receipt(ISSUER_SK, r)
+    emit(
+        "25-unknown-top-level-member",
+        "Unknown top-level member 'workflow_id' (signed over, so the signature is fine). "
+        "Strict verifiers MUST reject it at the structural stage; additions belong in "
+        "the namespace-prefixed 'extensions' object.",
+        "spec.md §3, §12.1",
+        "schema_fail",
+        r,
+    )
+
+
 def main() -> int:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Generating ARP v0.1 conformance vectors in {OUTPUT_DIR}\n")
@@ -757,8 +880,11 @@ def main() -> int:
     vector_20_invalid_did()
     vector_21_unknown_extension_tolerant()
     vector_22_unknown_category_tolerant()
+    vector_23_witnessed_receipt()
+    vector_24_witness_tampered()
+    vector_25_unknown_top_level_member()
 
-    print("\nDone. 22 vectors generated.")
+    print("\nDone. 25 vectors generated.")
     return 0
 
 
