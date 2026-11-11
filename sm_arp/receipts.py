@@ -251,6 +251,20 @@ def verify_signature(r: dict[str, Any]) -> VerifyResult:
     return VerifyResult.accepted()
 
 
+def _parse_rfc3339(value: object) -> datetime | None:
+    """An aware ``datetime`` for an RFC 3339 timestamp string, or ``None`` when
+    ``value`` is not a string, does not parse, or carries no UTC offset. Naive
+    timestamps are rejected: comparing them against aware ones is undefined, and
+    §3.1 requires the ``Z`` suffix anyway."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.utcoffset() is not None else None
+
+
 def dat_digest(dat: dict[str, Any]) -> str:
     """Canonical SHA-256 over the full *signed* DAT envelope — the value an
     ``authority_granted`` receipt commits to when it references a Delegated
@@ -301,8 +315,17 @@ def verify_authority_chain(
       to ``dat_verifier(dat, receipt)`` — sm-arp never imports sm-dat; the
       verifier is injected.
 
+    The grant itself is authenticated, not merely looked up: its Ed25519
+    signature must verify under its own ``issuer_did``, the index key must equal
+    its ``receipt_id``, ``granted_to_did`` must be present and equal the action's
+    ``issuer_did``, and ``grant_expires_at`` must be a well-formed RFC 3339
+    timestamp that is later than the action's ``issued_at`` (an absent or
+    unparseable expiry fails — a grant without an expiry is not "forever", it is
+    malformed). A grant index entry is caller-supplied data; this function trusts
+    none of it beyond what the grant's own signature proves.
+
     Passing neither ``dats`` nor ``dat_verifier`` preserves the exact pre-bridge
-    behaviour.
+    DAT behaviour.
     """
     gid = r["action"].get("granted_by_receipt_id")
     if not gid:
@@ -310,21 +333,44 @@ def verify_authority_chain(
     grant = grants.get(gid)
     if grant is None:
         return VerifyResult(False, "authority_chain", f"grant {gid} not found")
-    if grant["principal_did"] != r["principal_did"]:
+    if not isinstance(grant, dict) or not isinstance(grant.get("action"), dict):
+        return VerifyResult(False, "authority_chain", f"grant {gid} is not a receipt object")
+    if grant.get("receipt_id") != gid:
+        return VerifyResult(
+            False, "authority_chain", f"grant index key {gid} does not match grant receipt_id"
+        )
+    grant_sig = verify_signature(grant)
+    if not grant_sig.ok:
+        return VerifyResult(False, "authority_chain", f"grant {gid} signature: {grant_sig.detail}")
+    if grant.get("principal_did") != r["principal_did"]:
         return VerifyResult(False, "authority_chain", "principal mismatch with grant")
-    if grant["action"]["category"] != "authority_granted":
+    if grant["action"].get("category") != "authority_granted":
         return VerifyResult(False, "authority_chain", f"{gid} is not an authority_granted receipt")
-    mp = grant["action"].get("machine_payload", {})
-    expires = mp.get("grant_expires_at", "")
-    if expires and expires <= r["issued_at"]:
-        return VerifyResult(False, "authority_chain", f"grant expired ({expires})")
-    scope = mp.get("granted_scope", [])
+    mp = grant["action"].get("machine_payload")
+    if not isinstance(mp, dict):
+        return VerifyResult(False, "authority_chain", f"grant {gid} has no machine_payload")
+    expires = _parse_rfc3339(mp.get("grant_expires_at"))
+    if expires is None:
+        return VerifyResult(
+            False, "authority_chain", "grant_expires_at missing or not an RFC 3339 timestamp"
+        )
+    issued = _parse_rfc3339(r["issued_at"])
+    if issued is None:
+        return VerifyResult(False, "authority_chain", "issued_at is not an RFC 3339 timestamp")
+    if expires <= issued:
+        return VerifyResult(False, "authority_chain", f"grant expired ({mp['grant_expires_at']})")
+    scope = mp.get("granted_scope")
+    if not isinstance(scope, list) or not scope:
+        return VerifyResult(False, "authority_chain", "granted_scope missing or empty")
     cat = r["action"]["category"]
     if cat not in scope and "*" not in scope:
         return VerifyResult(
             False, "authority_chain", f"category {cat!r} outside grant scope {scope}"
         )
-    if mp.get("granted_to_did") not in (None, r["issuer_did"]):
+    grantee = mp.get("granted_to_did")
+    if not isinstance(grantee, str) or not grantee:
+        return VerifyResult(False, "authority_chain", "granted_to_did missing")
+    if grantee != r["issuer_did"]:
         return VerifyResult(False, "authority_chain", "issuer is not the grantee")
 
     # DAT bridge (opt-in) — resolve and richly evaluate a referenced DAT.

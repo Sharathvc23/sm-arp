@@ -122,12 +122,14 @@ A receipt whose `human_summary` is empty, machine-generated boilerplate (`"actio
 
 Optional UUID field referencing a prior `authority_granted` receipt that authorizes this action. Verifiers in **strict mode** (see §12) **MUST**:
 
-1. Resolve the referenced receipt by `(issuer_did, receipt_id)`.
-2. Confirm the referenced receipt's `principal_did` equals this receipt's `principal_did` (only the principal can authorize their own agent).
-3. Confirm the referenced receipt's `action.category == "authority_granted"`.
-4. Confirm the referenced receipt's `action.machine_payload.grant_expires_at` is in the future relative to this receipt's `issued_at`.
-5. Confirm this receipt's `action.category` appears in the referenced receipt's `action.machine_payload.granted_scope`, OR `"*"` appears in `granted_scope`.
-6. Confirm no `authority_revoked` receipt has been issued by the same `principal_did` referencing the original grant before this receipt's `issued_at`.
+1. Resolve the referenced receipt by `(issuer_did, receipt_id)`, and confirm the resolved receipt's `receipt_id` equals `granted_by_receipt_id` (a lookup that returns a different receipt is a failure, not a match).
+2. **Authenticate the grant**: verify the referenced receipt's own `signature` per §6.3 under *its* `issuer_did`. A grant whose signature does not verify authorizes nothing, whatever its fields say. (The grant index a verifier consults is caller-supplied data; this step is what makes the chain a chain of signatures rather than a chain of claims.)
+3. Confirm the referenced receipt's `principal_did` equals this receipt's `principal_did` (only the principal can authorize their own agent).
+4. Confirm the referenced receipt's `action.category == "authority_granted"`.
+5. Confirm the referenced receipt's `action.machine_payload.grant_expires_at` is present, parses as an RFC 3339 timestamp with a UTC offset, and is later than this receipt's `issued_at` **compared as instants**, not as strings (`2030-01-01T01:00:00+01:00` is `2030-01-01T00:00:00Z`). An absent, empty, or unparseable expiry is a failure — a grant with no expiry is malformed, not perpetual.
+6. Confirm `action.machine_payload.granted_scope` is a non-empty array and this receipt's `action.category` appears in it, OR `"*"` appears in it.
+7. Confirm `action.machine_payload.granted_to_did` is present, non-empty, and equals this receipt's `issuer_did`. An absent grantee is a failure, not "anyone".
+8. Confirm no `authority_revoked` receipt has been issued by the same `principal_did` referencing the original grant before this receipt's `issued_at`.
 
 If any check fails, the receipt **MUST** be flagged `authority_chain_invalid` and rejected in strict mode. Tolerant verifiers (see §12) **MAY** accept the receipt but **MUST** surface the failure to the audit consumer.
 

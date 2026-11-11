@@ -111,7 +111,11 @@ def test_authority_chain_scope() -> None:
         action=build_action(
             category="authority_granted",
             human_summary="granted",
-            machine_payload={"granted_to_did": agent.did, "granted_scope": ["data_shared"]},
+            machine_payload={
+                "granted_to_did": agent.did,
+                "granted_scope": ["data_shared"],
+                "grant_expires_at": "2099-01-01T00:00:00Z",
+            },
         ),
     )
     grants = {grant["receipt_id"]: grant}
