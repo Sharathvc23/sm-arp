@@ -1,0 +1,25 @@
+{
+  "id": "25-unknown-top-level-member",
+  "description": "Unknown top-level member 'workflow_id' (signed over, so the signature is fine). Strict verifiers MUST reject it at the structural stage; additions belong in the namespace-prefixed 'extensions' object.",
+  "spec_ref": "spec.md §3, §12.1",
+  "expected_outcome": "schema_fail",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "08080808-0808-4808-8808-080808080808",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T21:00:00Z",
+    "action": {
+      "category": "message_sent",
+      "human_summary": "A message carrying an unknown top-level member instead of an extension.",
+      "outcome": "completed"
+    },
+    "workflow_id": "WF-12345",
+    "signature": "PQ6CcuybdHLgEy1VTClQSyCKuQ91YU5wPEF9IEQ8GTDGGVOlEZ0Vz7Vh9xTgRZun+HTsfPEQ90DN7zpnbxB/Ag=="
+  }
+}

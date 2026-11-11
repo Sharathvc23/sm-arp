@@ -187,7 +187,12 @@ def verify_receipt(
     treated as ``hash_chain`` failure in ``strict`` mode and as
     ``accepted`` in ``tolerant`` mode (the verifier acknowledges the
     chain claim cannot be evaluated without the prior).
+
+    ``mode`` must be ``"strict"`` or ``"tolerant"``; anything else raises
+    ``ValueError`` instead of silently behaving as tolerant.
     """
+    if mode not in VERIFIER_MODES:
+        raise ValueError(f"unknown verifier mode {mode!r}; expected one of {VERIFIER_MODES}")
     schema_res = validate_schema(receipt)
     if not schema_res.ok:
         return schema_res
@@ -239,6 +244,7 @@ def compute_chain_link(prior_receipt: dict[str, Any]) -> str:
 
 
 __all__ = [
+    "VERIFIER_MODES",
     "VerificationResult",
     "compute_chain_link",
     "validate_schema",

@@ -96,6 +96,22 @@ def test_vector_matches_expected_outcome(vector_path: Path, chain_priors: dict[s
         )
 
 
+def test_unknown_verifier_mode_is_rejected() -> None:
+    """A mode other than strict/tolerant used to behave as tolerant silently."""
+    v = _load(VECTORS_DIR / "01-basic-purchase.json")
+    with pytest.raises(ValueError, match="unknown verifier mode"):
+        verify_receipt(v["receipt"], mode="lenient")
+
+
+def test_witness_appended_after_issuance_does_not_move_the_chain_link() -> None:
+    """Spec §6.4: the chain link detaches ``evidence.witness_signatures``, so vector
+    23's link equals the link of the same receipt with its witnesses removed."""
+    v23 = _load(VECTORS_DIR / "23-witnessed-receipt.json")["receipt"]
+    stripped = json.loads(json.dumps(v23))
+    del stripped["evidence"]["witness_signatures"]
+    assert compute_chain_link(v23) == compute_chain_link(stripped)
+
+
 def test_at_least_20_vectors_present() -> None:
     """Spec promises 20+ vectors; this protects against accidental deletion."""
     assert len(ALL_VECTORS) >= 20, f"only {len(ALL_VECTORS)} vectors found"

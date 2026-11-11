@@ -211,6 +211,21 @@ _REQUIRED_TOP = (
     "action",
     "signature",
 )
+# §3.2 — every optional top-level member a v0.1 receipt may carry. Anything else at
+# the top level is an unknown member: §3 says a strict verifier MUST reject it (the
+# `extensions` object is the sanctioned carrier for additions), a tolerant one MAY
+# keep it. Mirrors `additionalProperties: false` in schema/arp/0.1/receipt.schema.json.
+_OPTIONAL_TOP = (
+    "authority_chain",
+    "evidence",
+    "previous_receipt_hash",
+    "jurisdiction",
+    "accessibility",
+    "extensions",
+)
+KNOWN_TOP_LEVEL_MEMBERS = frozenset(_REQUIRED_TOP + _OPTIONAL_TOP)
+
+VERIFIER_MODES = ("strict", "tolerant")
 
 
 def _check_structure(r: dict[str, Any], *, strict: bool) -> VerifyResult | None:
@@ -219,9 +234,15 @@ def _check_structure(r: dict[str, Any], *, strict: bool) -> VerifyResult | None:
     for field in _REQUIRED_TOP:
         if field not in r:
             return VerifyResult(False, "structure", f"missing required field {field!r}")
+    if strict:
+        unknown = sorted(k for k in r if k not in KNOWN_TOP_LEVEL_MEMBERS)
+        if unknown:
+            return VerifyResult(False, "structure", f"unknown top-level member(s) {unknown}")
     if r["version"] != ARP_VERSION:
         return VerifyResult(False, "structure", f"unexpected version {r['version']!r}")
     action = r["action"]
+    if not isinstance(action, dict):
+        return VerifyResult(False, "structure", "action is not an object")
     for field in ("category", "human_summary", "outcome"):
         if field not in action:
             return VerifyResult(False, "structure", f"action missing {field!r}")
@@ -422,7 +443,18 @@ def verify_receipt(
     prior: dict[str, Any] | None = None,
     check_chain: bool = False,
 ) -> VerifyResult:
-    """Full verification: structure → signature → authority → hash chain."""
+    """Verify a receipt: structure → signature, then the opt-in stages.
+
+    By default only the structural envelope (§3) and the issuer's Ed25519
+    signature (§6.3) are checked. The authority chain (§4.5) is checked only when
+    a ``grants`` index is supplied, and the hash chain (§6.4) only when
+    ``check_chain=True`` (with ``prior`` being the predecessor, or ``None`` for a
+    genesis receipt). ``mode`` is ``"strict"`` (default) or ``"tolerant"``; any
+    other value is a programming error and raises ``ValueError`` rather than
+    silently weakening verification.
+    """
+    if mode not in VERIFIER_MODES:
+        raise ValueError(f"unknown verifier mode {mode!r}; expected one of {VERIFIER_MODES}")
     strict = mode == "strict"
     structural = _check_structure(r, strict=strict)
     if structural is not None:

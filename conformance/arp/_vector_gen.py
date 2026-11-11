@@ -830,6 +830,28 @@ def vector_24_witness_tampered() -> None:
     )
 
 
+def vector_25_unknown_top_level_member() -> None:
+    """An unknown top-level member MUST be rejected by a strict verifier (§3) even
+    though the issuer signed over it — `extensions` is the carrier for additions."""
+    r = base_receipt(
+        receipt_id="08080808-0808-4808-8808-080808080808",
+        issued_at="2026-05-21T21:00:00Z",
+        category="message_sent",
+        human_summary="A message carrying an unknown top-level member instead of an extension.",
+    )
+    r["workflow_id"] = "WF-12345"  # should have been extensions["acme.example.workflow-id"]
+    sign_receipt(ISSUER_SK, r)
+    emit(
+        "25-unknown-top-level-member",
+        "Unknown top-level member 'workflow_id' (signed over, so the signature is fine). "
+        "Strict verifiers MUST reject it at the structural stage; additions belong in "
+        "the namespace-prefixed 'extensions' object.",
+        "spec.md §3, §12.1",
+        "schema_fail",
+        r,
+    )
+
+
 def main() -> int:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Generating ARP v0.1 conformance vectors in {OUTPUT_DIR}\n")
@@ -860,8 +882,9 @@ def main() -> int:
     vector_22_unknown_category_tolerant()
     vector_23_witnessed_receipt()
     vector_24_witness_tampered()
+    vector_25_unknown_top_level_member()
 
-    print("\nDone. 24 vectors generated.")
+    print("\nDone. 25 vectors generated.")
     return 0
 
 
