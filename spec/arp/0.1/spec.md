@@ -29,7 +29,7 @@ A "conformant ARP implementation" is one that:
 
 ## 3. Receipt envelope
 
-A Receipt is a JSON object. Unknown members at the top level **MUST** be rejected by a strict verifier; an interoperability-tolerant verifier **MAY** accept and preserve them. (See §12 for the namespace-prefixed `extensions` carrier intended for forward-compatible additions.)
+A Receipt is a JSON object. Unknown members at the top level **MUST** be rejected by a strict verifier; an interoperability-tolerant verifier **MAY** accept and preserve them. (See §12 for the namespace-prefixed `extensions` carrier intended for forward-compatible additions.) The known members are exactly those listed in §3.1 and §3.2; `schema/arp/0.1/receipt.schema.json` enforces this with `additionalProperties: false`, and the reference implementation (`sm_arp.verify_receipt`, strict mode) rejects any other member at its structural stage.
 
 ### 3.1 Required top-level members
 

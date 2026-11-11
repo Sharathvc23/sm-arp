@@ -29,11 +29,29 @@ r = issue_receipt(
     principal_did=me.did,
     action=build_action(category="data_shared", human_summary="shared my calendar"),
 )
-assert verify_receipt(r).ok  # structure → signature → authority → hash chain
+assert verify_receipt(r).ok  # structure (§3) → issuer signature (§6.3); nothing else by default
 IssuerLog("log.sqlite").append(r)  # SQLite Issuer/Agency Log, hash-chained per issuer
 ```
 
-`sm_arp`'s verifier is tested against the canonical 22-vector corpus and asserted
+`verify_receipt(r)` on its own checks **structure and signature only**. The other two
+stages are opt-in, because each needs context the receipt does not carry:
+
+```python
+grants = {grant["receipt_id"]: grant}            # the authority_granted receipts you trust
+verify_receipt(r, grants=grants)                 # + authority chain (§4.5): the grant's own
+                                                 #   signature, grantee, scope and expiry
+verify_receipt(r2, prior=r1, check_chain=True)   # + hash chain (§6.4); prior=None for genesis
+verify_receipt(r, mode="tolerant")               # accept unknown categories / top-level members
+```
+
+`mode` is `"strict"` (default) or `"tolerant"`; anything else raises `ValueError`.
+`verify_direct_grant(action, grant, at=...)` is the stricter, fully authenticated
+single-grant check (see below). Witness co-signatures in `evidence.witness_signatures`
+are **detached evidence** (spec §5.1): appending one after issuance leaves the issuer
+signature and the chain link intact — `sm_arp.vrp.cosign_receipt` / `is_corroborated`
+read and write them.
+
+`sm_arp`'s verifier is tested against the canonical 25-vector corpus and asserted
 byte-for-byte equal to the conformance harness's verdict on every vector — so the
 library and the spec cannot disagree.
 
@@ -47,7 +65,7 @@ library and the spec cannot disagree.
 - `spec/arp/0.1/governance.md` — stewardship and the path to public publication.
 - `spec/arp/0.1/dat-companion.md` — the Delegated Authority Token sketch the authority chain references.
 - `schema/arp/0.1/` — JSON Schemas (Draft 2020-12) for the receipt envelope.
-- `vectors/arp/0.1/` — 22 language-agnostic receipt vectors.
+- `vectors/arp/0.1/` — 25 language-agnostic receipt vectors.
 - `conformance/arp/` — framework-agnostic Python conformance harness for receipts.
 
 ## The conformance badge lives in sm-conformance
@@ -84,4 +102,4 @@ MIT — see [LICENSE](./LICENSE).
 
 ### Authenticated direct grants (0.3.3)
 
-Use `verify_direct_grant(action, grant, at=trusted_aware_datetime)` for an explicit single-category grant. It checks both issuer signatures, the ID link, principal, grantee, and validity at the supplied time. A referenced DAT requires its evidence and an injected verifier. Supply an independently trusted grant issuer and policy at the application boundary. For historical checks supply the independently evidenced execution time. The existing `verify_authority_chain` checks relationships against a caller-provided grant index. Preserve signed receipts as issued; append detached evidence outside them to preserve signatures and chain links.
+Use `verify_direct_grant(action, grant, at=trusted_aware_datetime)` for an explicit single-category grant. It checks both issuer signatures, the ID link, principal, grantee, and validity at the supplied time. A referenced DAT requires its evidence and an injected verifier. Supply an independently trusted grant issuer and policy at the application boundary. For historical checks supply the independently evidenced execution time. `verify_authority_chain` (0.4.0+) authenticates the grant it is handed — its signature, its `receipt_id` against the index key, a present grantee equal to the acting issuer, and a present RFC 3339 expiry compared as an instant — before checking scope. Witness co-signatures are detached from the issuer signature and the chain link (spec §5.1), so appending `evidence.witness_signatures` to an issued receipt preserves both.

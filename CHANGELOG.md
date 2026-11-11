@@ -1,5 +1,46 @@
 # Changelog — sm-arp
 
+## 0.4.0 — detached witness evidence, authenticated authority chain, strict structure (audit 2026-11)
+
+Fixes every finding of the 2026-11 audit of sm-arp and its consumers (sm-oversight,
+sm-dat, sm-parc). The minor bump is for the canonicalization change below; existing
+receipts without witnesses are unaffected byte-for-byte (none of the 22 pre-existing
+vectors was re-signed), and the public API is additive.
+
+- **`evidence.witness_signatures` is detached from the issuer signature and the hash
+  chain** (spec §5.1 / §6.1 / §6.4, spec changelog v0.1.1). `canonical_bytes(...)` now
+  excludes `evidence.witness_signatures` for both `include_signature` settings, dropping
+  an `evidence` object the removal leaves empty; `chain_link` therefore no longer moves
+  when a witness lands. `vrp._corroboration_payload` is now literally
+  `canonical_bytes(r, include_signature=False)`, so the issuer signature, the chain link
+  and the VRP corroboration payload share one rule — the one sm-oversight's
+  `_quorum_bytes` already used. Before: sm-oversight's `add_witness` and VRP's
+  `cosign_receipt` both invalidated the issuer's signature of the receipt they
+  co-signed. New public helper `detach_witnesses(receipt)`.
+- **`is_corroborated` accepts `signer_did` as an alias for `witness_did`** (the key
+  sm-oversight writes); `witness_did` governs when both are present and
+  `cosign_receipt` keeps writing `witness_did`.
+- **`verify_authority_chain` authenticates the grant.** It now verifies the grant
+  receipt's Ed25519 signature, requires the index key to equal the grant's `receipt_id`,
+  requires a present, non-empty `granted_to_did` equal to the action's `issuer_did`,
+  requires `grant_expires_at` to be a present, aware RFC 3339 timestamp compared as an
+  instant against the action's `issued_at` (absent/empty/unparseable expiry fails; it
+  used to mean "never expires" and was compared as a string), and requires a non-empty
+  `granted_scope` list. Malformed grant objects fail at the `authority_chain` stage
+  instead of raising. `verify_direct_grant` is unchanged.
+- **Strict mode rejects unknown top-level members** (spec §3 MUST; the schema already
+  enforced it with `additionalProperties: false`). `KNOWN_TOP_LEVEL_MEMBERS` exported.
+  Note: `issue_receipt(..., composition=...)` emits a member the spec does not define;
+  such receipts were never schema-valid and now also fail strict library verification.
+- **`verify_receipt(mode=...)` and the conformance harness reject unknown modes with
+  `ValueError`** instead of silently behaving as tolerant; `arp verify --mode` exits 2.
+  `VERIFIER_MODES` exported.
+- **README** no longer claims `verify_receipt(r).ok` checks authority and hash chain by
+  default; it documents what the default does and how to enable the rest.
+- **Vectors 23–25** (`23-witnessed-receipt`, `24-witness-tampered`,
+  `25-unknown-top-level-member`); corpus 22 → 25, suite digest changes accordingly.
+
+
 ## 0.3.4
 
 Direct grants require the named principal to sign the grant receipt.

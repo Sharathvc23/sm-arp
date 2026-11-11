@@ -203,7 +203,7 @@ delegated authority that algorithms can traverse, audit, and reason about.
 ## Related project
 
 This repository is the **prototype**. The full specification, conformance
-vectors (22 of them), additional schemas, and a developer-facing CLI
+vectors (25 of them), additional schemas, and a developer-facing CLI
 (`arp verify`, `arp render`, `arp walk-authority`, `arp keygen`, `arp issue`,
 `arp grant`, `arp revoke`, `arp demo`) live in the parent project:
 
