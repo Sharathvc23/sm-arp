@@ -36,7 +36,9 @@ and "`P` actually authorized `A` to do `X`."**
 - The integrity and completeness of the **issuer log** that the hash chain is checked
   against, and of the verifier's **replay seen-set**.
 
-**Trust boundary:** the signature covers the canonical receipt minus `signature`. Fields
+**Trust boundary:** the signature covers the canonical receipt minus `signature` and minus
+the detached `evidence.witness_signatures` (spec §5.1 — witnesses are third-party evidence
+appended after issuance; each is verified under its *own* key, never under the issuer's). Fields
 the verifier reads but does **not** cryptographically tie to a third party — notably
 `principal_did`, `authority_chain` (descriptive in v0.1), and `jurisdiction`
 (self-asserted, never validated) — are only as trustworthy as the issuing agent. The

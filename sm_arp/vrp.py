@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import base64
 import binascii
-import copy
 import hashlib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -36,6 +35,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from .identity import did_from_sk, pubkey_from_did
+from .receipts import canonical_bytes
 
 _ED25519_MULTICODEC = b"\xed\x01"
 # An AgentFacts attestation's lifecycle states (VRP 0.2 §A).
@@ -307,18 +307,20 @@ def pubkey_from_did_key(did: str) -> bytes:
 
 def _corroboration_payload(receipt: dict[str, Any]) -> bytes:
     """The JCS bytes a counterparty signs: the receipt minus the two mutable
-    signature carriers — top-level ``signature`` and ``evidence.witness_signatures``.
-    An otherwise-empty ``evidence`` is dropped so the bytes are stable, so the
+    signature carriers — top-level ``signature`` and ``evidence.witness_signatures``
+    (an otherwise-empty ``evidence`` is dropped so the bytes are stable). These are
+    exactly the bytes the issuer signed (ARP §6.1) — one detached-witness rule
+    governs the issuer signature, the chain link and corroboration — so the
     counterparty signs *what happened* (action, counterparty, evidence, chain links)
     without depending on the issuer's signature or any other witness."""
-    r = copy.deepcopy(receipt)
-    r.pop("signature", None)
-    evidence = r.get("evidence")
-    if isinstance(evidence, dict):
-        evidence.pop("witness_signatures", None)
-        if not evidence:
-            r.pop("evidence", None)
-    return bytes(jcs.canonicalize(r))
+    return canonical_bytes(receipt, include_signature=False)
+
+
+def _witness_did(entry: dict[str, Any]) -> object:
+    """The DID a ``witness_signatures`` entry names. ``witness_did`` is the spec's
+    key (ARP §5); ``signer_did`` is the accepted alias some writers (sm-oversight's
+    quorum) emit. ``witness_did`` wins when both are present."""
+    return entry["witness_did"] if "witness_did" in entry else entry.get("signer_did")
 
 
 def _counterparty(receipt: dict[str, Any]) -> str | None:
@@ -339,7 +341,7 @@ def is_corroborated(receipt: dict[str, Any]) -> bool:
     witnesses = (receipt.get("evidence") or {}).get("witness_signatures") or []
     payload = _corroboration_payload(receipt)
     for entry in witnesses:
-        if not isinstance(entry, dict) or entry.get("witness_did") != cp:
+        if not isinstance(entry, dict) or _witness_did(entry) != cp:
             continue
         try:
             pubkey_from_did(cp).verify(

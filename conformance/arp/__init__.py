@@ -85,9 +85,30 @@ _VALIDATOR = Draft202012Validator(_RECEIPT_SCHEMA, registry=_REGISTRY)
 # ── core verification ──────────────────────────────────────────────
 
 
+VERIFIER_MODES = ("strict", "tolerant")
+
+
+def _detach_witnesses(receipt: dict[str, Any]) -> dict[str, Any]:
+    """The receipt without ``evidence.witness_signatures`` (spec §5, §6.1), dropping
+    an ``evidence`` object the removal leaves empty. Witness co-signatures are
+    detached evidence appended by third parties after issuance: they are outside
+    the issuer's signature and outside the hash chain. Never mutates its input."""
+    body = dict(receipt)
+    evidence = body.get("evidence")
+    if isinstance(evidence, dict) and "witness_signatures" in evidence:
+        evidence = {k: v for k, v in evidence.items() if k != "witness_signatures"}
+        if evidence:
+            body["evidence"] = evidence
+        else:
+            del body["evidence"]
+    return body
+
+
 def _canonical_bytes_for_signing(receipt: dict[str, Any]) -> bytes:
-    """JCS-canonical bytes of the receipt with the signature field removed."""
-    body = {k: v for k, v in receipt.items() if k != "signature"}
+    """JCS-canonical bytes of the receipt with the signature field removed and the
+    witness evidence detached (spec §6.1)."""
+    body = _detach_witnesses(receipt)
+    body.pop("signature", None)
     return jcs.canonicalize(body)
 
 
@@ -202,12 +223,14 @@ def verify_receipt(
 
 
 def compute_chain_link(prior_receipt: dict[str, Any]) -> str:
-    """sha256: hash of the full canonical receipt INCLUDING signature.
+    """sha256: hash of the canonical receipt INCLUDING its signature and
+    EXCLUDING the detached ``evidence.witness_signatures`` (spec §6.4).
 
     This is the value the next receipt's ``previous_receipt_hash`` MUST
-    equal to form a valid chain.
+    equal to form a valid chain. Because witnesses are detached, a co-signature
+    appended to the prior after the successor was issued does not break the link.
     """
-    canonical = jcs.canonicalize(prior_receipt)
+    canonical = jcs.canonicalize(_detach_witnesses(prior_receipt))
     digest = hashlib.sha256(canonical).hexdigest()
     return f"sha256:{digest}"
 

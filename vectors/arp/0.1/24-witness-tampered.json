@@ -1,0 +1,47 @@
+{
+  "id": "24-witness-tampered",
+  "description": "Counterparty co-signature tampered after the fact. The issuer signature still verifies (witnesses are outside it) but the receipt is NOT corroborated: is_corroborated MUST be false. Tampering a witness breaks only that witness.",
+  "spec_ref": "spec.md §5, §6.1; VRP §A",
+  "expected_outcome": "verify_pass",
+  "verifier_mode": "strict",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE=",
+    "counterparty": "YXJwLXZlY3Rvci1jb3VudGVycGFydHktc2VlZDMyYiE=",
+    "witness": "YXJwLXZlY3Rvci13aXRuZXNzLXNlZWQtMzJieXRlcyE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "09090909-0909-4909-8909-090909090909",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T20:50:00Z",
+    "action": {
+      "category": "purchase",
+      "human_summary": "Paid Toscanini's $9.50 for two scoops; the shop's agent co-signed.",
+      "outcome": "completed",
+      "counterparty_did": "did:key:z6MkkjfwJUSqmSB49ZaMWLuwPtmn9X4ZnZ4B6yPnfDE5cXKp",
+      "counterparty_label": "Toscanini's Ice Cream",
+      "amount": {
+        "currency": "USD",
+        "cents": -950
+      }
+    },
+    "evidence": {
+      "external_refs": [
+        "TOSC-20260521-0042"
+      ],
+      "witness_signatures": [
+        {
+          "witness_did": "did:key:z6MkkjfwJUSqmSB49ZaMWLuwPtmn9X4ZnZ4B6yPnfDE5cXKp",
+          "signature": "zvHakEcklxnCg6NTitQxdUdkJ/6SMQy91t4s1VdW9dRx8DY1fGLD00/0Yrse70WHX1AdHSKSv0EfRHNAdE5cDg=="
+        },
+        {
+          "witness_did": "did:key:z6Mkjkc5ifoR3JdqJbc7sVsStbTjq6eSDKBz91oiSETHNcEF",
+          "signature": "FhHIW173FbQsUF9ODd0EbliD9iPbJmc5MtoDFvyZzxwrQPVQ60SVnhwl9NtPtmnXi4yvGcU5WsnQs7p+3KeCDQ=="
+        }
+      ]
+    },
+    "signature": "XbH1waHLU7hxBIpvrqTH7mnOmwn4R0c8n3/ydVXG/wqfmsO802GjQCif5HGy9eM/lfbwT41vCqcdHMpn8IFfBw=="
+  }
+}

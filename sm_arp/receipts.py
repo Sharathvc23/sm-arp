@@ -1,6 +1,7 @@
 """ARP v0.1 receipts — build, sign, and verify per ``spec/arp/0.1``.
 
-* canonicalise the body sans-``signature`` with RFC 8785 JCS,
+* canonicalise the body sans-``signature`` and sans the detached witness
+  evidence (``evidence.witness_signatures``) with RFC 8785 JCS,
 * sign the canonical bytes with the issuer's Ed25519 key,
 * attach a standard-base64 (padded) signature.
 
@@ -51,15 +52,49 @@ def now_iso() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def detach_witnesses(receipt: dict[str, Any]) -> dict[str, Any]:
+    """A shallow-enough copy of ``receipt`` with ``evidence.witness_signatures``
+    removed (§5, §6.1). An ``evidence`` object left empty by the removal is dropped
+    too, so a receipt that carried *only* witnesses canonicalises to the same
+    bytes as one that never had an ``evidence`` member.
+
+    Witness co-signatures are *detached evidence*: third parties append them
+    after the issuer signed, so they are outside the issuer's signature and
+    outside the hash chain. This is the single rule every ARP byte-commitment
+    shares — the issuer signature, the chain link, and the VRP corroboration
+    payload — so a witness appended later never invalidates the issuer or moves
+    the chain. The input is never mutated.
+    """
+    body = dict(receipt)
+    evidence = body.get("evidence")
+    if isinstance(evidence, dict) and "witness_signatures" in evidence:
+        evidence = {k: v for k, v in evidence.items() if k != "witness_signatures"}
+        if evidence:
+            body["evidence"] = evidence
+        else:
+            del body["evidence"]
+    return body
+
+
 def canonical_bytes(receipt: dict[str, Any], *, include_signature: bool) -> bytes:
-    """JCS-canonical bytes of a receipt, with or without the signature field."""
-    body = {k: v for k, v in receipt.items() if include_signature or k != "signature"}
+    """JCS-canonical bytes of a receipt, with or without the ``signature`` field.
+
+    ``evidence.witness_signatures`` is always detached (see :func:`detach_witnesses`):
+    ``include_signature=False`` yields the bytes the issuer signs (§6.1) and
+    ``include_signature=True`` the bytes the hash chain links (§6.4).
+    """
+    body = detach_witnesses(receipt)
+    if not include_signature:
+        body.pop("signature", None)
     # jcs is untyped (no py.typed); canonicalize returns bytes at runtime.
     return cast(bytes, jcs.canonicalize(body))
 
 
 def chain_link(receipt: dict[str, Any]) -> str:
-    """``sha256:<hex>`` over the JCS bytes of a *signed* receipt (§6.4)."""
+    """``sha256:<hex>`` over the JCS bytes of a *signed* receipt (§6.4) — the
+    issuer-signed body *including* its ``signature`` and *excluding* the detached
+    ``evidence.witness_signatures``, so a witness appended after issuance does not
+    change the link a successor receipt already committed to."""
     digest = hashlib.sha256(canonical_bytes(receipt, include_signature=True)).hexdigest()
     return f"sha256:{digest}"
 

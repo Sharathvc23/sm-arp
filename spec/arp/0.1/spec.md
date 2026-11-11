@@ -165,9 +165,22 @@ v0.1 does NOT mandate authority chains — they remain optional for backward com
 | `prompt_lineage_hash` | string | `sha256:<hex>` of the prompt chain that produced this action — tamper-evident lineage of what the agent was instructed to do. The full prompt is held privately by the issuer; only its hash is published. |
 | `decision_trace_hash` | string | `sha256:<hex>` of the agent's internal reasoning trace, if recorded. Same privacy posture as `prompt_lineage_hash`. |
 | `tool_invocations` | array of `{ tool_did, mcp_server_uri?, request_hash, response_hash, timestamp }` | When the action involved MCP tool invocations, summary of each. Hashes preserve audit-ability without leaking content. |
-| `witness_signatures` | array of `{ witness_did, signature }` | Co-signatures from additional agents who attest to the action. Useful for high-stakes actions where the principal wants more than one signature. |
+| `witness_signatures` | array of `{ witness_did, signature }` | Co-signatures from additional agents who attest to the action. Useful for high-stakes actions where the principal wants more than one signature. **Detached evidence** — see §5.1. |
 
 `evidence` and its fields are all optional. A verifier **MUST NOT** reject a receipt solely because `evidence` is missing or sparse.
+
+### 5.1 Witness signatures are detached evidence
+
+A witness co-signature is, by construction, appended to a receipt *after* the issuer signed it — by a counterparty corroborating the interaction (VRP §A), by a reviewer panel forming a quorum, or by any third party attesting to the action. It therefore cannot be inside the bytes the issuer signed, and a verifier **MUST NOT** treat its arrival as tampering.
+
+Normatively:
+
+- `evidence.witness_signatures` is **excluded** from the canonical string `C` the issuer signs (§6.1), from the hash-chain link (§6.4), and from the bytes a witness itself signs. One rule governs all three: remove `evidence.witness_signatures`; if that leaves `evidence` empty, remove `evidence` too (so a receipt whose evidence is *only* witnesses canonicalises identically to one with no evidence); then remove `signature` for the signing/witness payload, or keep it for the chain link.
+- Each entry **MUST** carry the co-signer's did:key under `witness_did` and a standard-base64 Ed25519 signature over the §6.1 canonical string `C` of the receipt under `signature`. Writers **MUST** emit `witness_did`. Readers **MUST** also accept `signer_did` as an alias for `witness_did` (an alias that pre-dates this clarification); when both are present `witness_did` governs.
+- Because witnesses are outside the issuer signature, **tampering with a witness entry breaks only that witness**: the issuer's signature and the chain link are unaffected, and the tampered entry simply stops verifying (so, e.g., it no longer corroborates). Vectors `23-witnessed-receipt` and `24-witness-tampered` pin both halves of this property.
+- A verifier checking the issuer signature **MUST NOT** evaluate witness entries; whether a given witness is meaningful (is it the counterparty? is it a trusted reviewer? how many are required?) is a policy of the layer consuming the evidence, not of receipt verification.
+
+The remaining `evidence` fields (`screenshots`, `external_refs`, hashes, `tool_invocations`) are issuer-asserted and **are** covered by the issuer signature.
 
 ## 6. Canonical signing
 
@@ -177,8 +190,11 @@ The Receipt **MUST** be signed with the issuer agent's Ed25519 private key. The 
 
 1. Take the full Receipt JSON object.
 2. Remove the `signature` field if present.
-3. Serialize per [RFC 8785 JSON Canonicalization Scheme] (JCS). This produces a deterministic byte string regardless of input ordering, whitespace, or encoding nuance.
-4. The result is the canonical string `C`.
+3. Remove `evidence.witness_signatures` if present (detached evidence, §5.1). If that leaves `evidence` an empty object, remove `evidence` as well.
+4. Serialize per [RFC 8785 JSON Canonicalization Scheme] (JCS). This produces a deterministic byte string regardless of input ordering, whitespace, or encoding nuance.
+5. The result is the canonical string `C`.
+
+For a receipt with no `evidence.witness_signatures` — every receipt an issuer emits, since witnesses are appended later — step 3 is a no-op and `C` is unchanged from earlier drafts of this section; no existing signature is affected.
 
 ### 6.2 Signing
 
@@ -198,7 +214,7 @@ A verifier **MUST**:
 4. Decode the `signature` base64 to 64 bytes.
 5. Verify the Ed25519 signature over `C` using the resolved public key. **MUST** reject if verification fails.
 6. Check that `issued_at` is within the accept window (default ±300 s).
-7. If `previous_receipt_hash` is present, fetch the prior receipt by its `receipt_id` (which **MUST** be discoverable in the issuer log) and verify that `sha256(<canonical bytes of prior receipt incl. its signature>)` equals the declared hash. **MUST** reject if the hash does not match.
+7. If `previous_receipt_hash` is present, fetch the prior receipt by its `receipt_id` (which **MUST** be discoverable in the issuer log) and verify that `sha256(<canonical bytes of prior receipt incl. its signature, excl. detached witness evidence>)` (§6.4) equals the declared hash. **MUST** reject if the hash does not match.
 
 A verifier **SHOULD** additionally:
 
@@ -207,7 +223,9 @@ A verifier **SHOULD** additionally:
 
 ### 6.4 Hash chain
 
-When an issuer chooses to maintain a hash chain across its receipts, each receipt's `previous_receipt_hash` **MUST** equal the SHA-256 hash of the previous receipt **including its `signature`**, computed over the JCS-canonicalized bytes of the full receipt.
+When an issuer chooses to maintain a hash chain across its receipts, each receipt's `previous_receipt_hash` **MUST** equal the SHA-256 hash of the previous receipt **including its `signature`** and **excluding `evidence.witness_signatures`** (and excluding `evidence` itself if the removal leaves it empty — the same detached rule as §6.1 step 3), computed over the JCS-canonicalized bytes of what remains. The link is `sha256:<64 lowercase hex>`.
+
+The chain link is defined over the detached form for the same reason the signature is: a witness is appended to the predecessor *after* the successor committed to its link. If witnesses were inside the link, every co-signature would retroactively break the chain behind it. Under this rule a predecessor may gain witnesses indefinitely and every successor still links.
 
 The chain is per-issuer. Different agents issue independent chains. The "first" receipt in a chain (genesis) **MUST** omit `previous_receipt_hash`; later receipts **MUST** include it.
 
