@@ -5,8 +5,12 @@ typer.testing.CliRunner.
 
 from __future__ import annotations
 
+import json
+
+import pytest
+
 from arp_cli.cli import app
-from tests.cli.conftest import strip_ansi
+from tests.cli.conftest import VECTORS_DIR, strip_ansi
 
 # ── arp verify ─────────────────────────────────────────────────────
 
@@ -231,10 +235,10 @@ def test_render_show_crypto_exposes_dids(runner, nanda_trace, tmp_path):
 # ── arp vectors ────────────────────────────────────────────────────
 
 
-def test_vectors_list_shows_all_25(runner):
+def test_vectors_list_shows_all_29(runner):
     result = runner.invoke(app, ["vectors", "list"])
     assert result.exit_code == 0
-    assert "25 vector(s)" in strip_ansi(result.output)
+    assert "29 vector(s)" in strip_ansi(result.output)
 
 
 def test_vectors_list_positive_filter(runner):
@@ -257,6 +261,39 @@ def test_vectors_run_negative_correctly_rejects(runner):
     result = runner.invoke(app, ["vectors", "run", "16-invalid-signature"])
     assert result.exit_code == 0  # the vector failing IS the expected outcome
     assert "correctly rejected" in strip_ansi(result.output)
+
+
+@pytest.mark.parametrize("vector_id", sorted(p.stem for p in VECTORS_DIR.glob("*.json")))
+def test_vectors_run_matches_every_documented_outcome(runner, vector_id):
+    """`arp vectors run` reaches each vector's documented verdict, including the
+    freshness (verifier_now) and reversal-issuer vectors."""
+    result = runner.invoke(app, ["vectors", "run", vector_id])
+    assert result.exit_code == 0, strip_ansi(result.output)
+
+
+def test_verify_trace_checks_reversal_issuer_against_held_original(runner, vectors_dir, tmp_path):
+    """In a trace, the file's own receipts are the originals the verifier holds."""
+    v01 = json.loads((vectors_dir / "01-basic-purchase.json").read_text())["receipt"]
+    v10 = json.loads((vectors_dir / "10-reversal.json").read_text())["receipt"]
+    v29 = json.loads((vectors_dir / "29-reversal-issuer-mismatch.json").read_text())["receipt"]
+
+    good = tmp_path / "good.json"
+    good.write_text(json.dumps([v01, v10]))
+    result = runner.invoke(app, ["verify", str(good)])
+    assert result.exit_code == 0, strip_ansi(result.output)
+
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps([v01, v29]))
+    result = runner.invoke(app, ["verify", str(bad)])
+    assert result.exit_code == 1
+    assert "reversal" in strip_ansi(result.output)
+
+
+def test_verify_applies_no_freshness_window(runner, vectors_dir):
+    """`arp verify` checks receipts after the fact (spec §3.3): an old receipt is not
+    stale because it is old."""
+    result = runner.invoke(app, ["verify", str(vectors_dir / "26-stale-issued-at.json")])
+    assert result.exit_code == 0, strip_ansi(result.output)
 
 
 def test_vectors_run_unknown_id(runner):

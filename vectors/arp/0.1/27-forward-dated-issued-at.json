@@ -1,0 +1,26 @@
+{
+  "id": "27-forward-dated-issued-at",
+  "description": "Validly signed, but issued_at is 301 s after verifier_now. The ±300 s window is symmetric: a forward-dated receipt MUST be rejected like a stale one.",
+  "spec_ref": "spec.md §3.3, §6.3 step 6",
+  "expected_outcome": "freshness_fail",
+  "verifier_mode": "strict",
+  "verifier_now": "2026-05-21T21:24:59Z",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "0c0c0c0c-0c0c-4c0c-8c0c-0c0c0c0c0c0c",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T21:30:00Z",
+    "action": {
+      "category": "message_sent",
+      "human_summary": "Confirmed the plumber for Thursday morning.",
+      "outcome": "completed",
+      "counterparty_did": "did:key:z6MkkjfwJUSqmSB49ZaMWLuwPtmn9X4ZnZ4B6yPnfDE5cXKp"
+    },
+    "signature": "X77J/fB/8ks8xzuo+q9QFAP8odixaY5dINCDjwG1oAsFYCyd/fEe6OvBhynFgax1bN6tTdPudX9AIZzwkoxhAA=="
+  }
+}

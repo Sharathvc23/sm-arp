@@ -17,6 +17,7 @@ produce (the spec's own vectors), where canonicalization bugs actually live.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -58,9 +59,27 @@ def _chain_priors() -> dict[str, dict[str, Any]]:
     return priors
 
 
+def _corpus_originals() -> dict[str, dict[str, Any]]:
+    """{receipt_id: receipt} over passing vectors: the originals a verifier holds for
+    the §4.2 reversal check — mirrors conformance/arp/test_arp_v01.py."""
+    return {
+        v["receipt"]["receipt_id"]: v["receipt"]
+        for v in map(_load, _VECTOR_PATHS)
+        if v["expected_outcome"] == "verify_pass"
+    }
+
+
+def _verifier_now(v: dict[str, Any]) -> datetime | None:
+    """A vector's §3.3 reference instant, or None (verified after the fact)."""
+    raw = v.get("verifier_now")
+    return datetime.fromisoformat(raw) if raw else None
+
+
 def _verify_vector(v: dict[str, Any], priors: dict[str, dict[str, Any]]) -> VerifyResult:
     """Run sm_arp.verify_receipt over a vector, resolving its hash-chain prior
-    the way a real consumer would (look the declared link up in what it's seen)."""
+    the way a real consumer would (look the declared link up in what it's seen),
+    holding the positive corpus as reversal originals, and applying the vector's
+    verifier_now (if any) as the freshness reference instant."""
     receipt = v["receipt"]
     declared = receipt.get("previous_receipt_hash")
     return verify_receipt(
@@ -68,6 +87,8 @@ def _verify_vector(v: dict[str, Any], priors: dict[str, dict[str, Any]]) -> Veri
         mode=v.get("verifier_mode", "strict"),
         prior=priors.get(declared) if declared else None,
         check_chain=bool(declared),
+        now=_verifier_now(v),
+        originals=_corpus_originals(),
     )
 
 
@@ -239,11 +260,20 @@ def test_verify_agrees_with_conformance(path: Path) -> None:
         for p in _VECTOR_PATHS
         if _load(p)["expected_outcome"] == "verify_pass"
     }
-    conf = conf_verify(v["receipt"], mode=v.get("verifier_mode", "strict"), prior_receipts=priors)
+    conf = conf_verify(
+        v["receipt"],
+        mode=v.get("verifier_mode", "strict"),
+        prior_receipts=priors,
+        originals=_corpus_originals(),
+        now=_verifier_now(v),
+    )
     lib = _verify_vector(v, _chain_priors())
     assert lib.ok == conf.ok, (
         f"{v['id']}: lib ok={lib.ok} ({lib.stage}) but conformance ok={conf.ok}"
     )
+    # The stages the two verifiers name identically must agree too.
+    if not lib.ok and lib.stage in ("freshness", "reversal"):
+        assert conf.stage == lib.stage, f"{v['id']}: lib {lib.stage} vs conformance {conf.stage}"
 
 
 # ── audit 2026-11: detached witness evidence (spec §5, §6.1, §6.4) ──────────

@@ -57,7 +57,11 @@ A Receipt is a JSON object. Unknown members at the top level **MUST** be rejecte
 ### 3.3 Field-level constraints
 
 - `version`, `receipt_id`, `issuer_did`, `principal_did`, `issued_at`, and `signature` **MUST** be non-empty strings.
-- `issued_at` **MUST** be within the verifier's accept window (default ±300 seconds from the verifier's current time, configurable per deployment). Outside this window the receipt **MUST** be rejected as stale.
+- `issued_at` freshness is checked against a **reference instant** the verifier supplies. The receipt does not carry one, and the right instant depends on why the receipt is being verified:
+  - A verifier that accepts a receipt **as a live event** (an Issuer Log or Agency Log ingesting it, a counterparty or downstream agent acting on it) **MUST** use its current time as the reference instant. It **MUST** reject the receipt as stale or forward-dated when `issued_at` is outside its accept window around that instant. The window defaults to ±300 seconds, inclusive, and is configurable per deployment.
+  - A verifier that checks a receipt **after the fact** (audit, dispute, archival re-verification, the vector corpus) **MUST NOT** reject it as stale for being older than a window around its own current time, because every receipt eventually is. It **MAY** check `issued_at` against an instant it has independent evidence for, such as when its log first recorded the receipt.
+
+  The receipt alone cannot tell a verifier which case applies. Implementations therefore take the reference instant as an explicit input. The reference implementation's `verify_receipt(r, now=..., max_skew_seconds=...)` applies the window only when `now` is supplied. Conformance vectors that exercise the window carry a `verifier_now` member giving that instant (vectors 26–28).
 - `issuer_did` and `principal_did` **MUST** be valid `did:key:` strings as defined in `spec/0.2/did-key.md`. Other DID methods are reserved for future versions.
 - `receipt_id` collisions are receipt-issuer-scoped, not global; two different issuers **MAY** independently use the same UUID without error.
 
@@ -81,7 +85,15 @@ The `action` member describes what was done.
 | `counterparty_label` | string | Human-readable name. Example: `"AMC Boston Common 19"`. |
 | `amount` | object | `{ "currency": "<ISO 4217 3-letter code>", "cents": <integer> }`. Negative `cents` indicates outgoing from the principal's perspective. |
 | `machine_payload` | object | Structured action-specific details. Schema is free-form by category; future minor versions of ARP **MAY** introduce per-category schemas. |
-| `reversal_of_receipt_id` | string | When `category` involves undoing a prior action, the UUID of the receipt being reversed. The issuer **MUST** be the same as the original receipt's issuer; the verifier **MUST** check this. |
+| `reversal_of_receipt_id` | string | When `category` involves undoing a prior action, the UUID of the receipt being reversed. The issuer **MUST** be the same as the original receipt's issuer; see the verifier rule below. |
+
+**Reversal issuer rule.** One agent cannot reverse another agent's receipt. A verifier that holds the original receipt, from its log or from an index it was given, **MUST** check this before accepting the reversal:
+
+1. The held original's `receipt_id` **MUST** equal `reversal_of_receipt_id`. A lookup that returns a different receipt is a failure.
+2. The original's `signature` **MUST** verify per §6.3 under its own `issuer_did`. A held copy whose signature fails proves nothing about who issued it.
+3. The original's `issuer_did` **MUST** equal the reversal's `issuer_did`.
+
+A verifier applying this rule **MUST** also reject a reversal whose `reversal_of_receipt_id` is its own `receipt_id` (a receipt cannot reverse itself) or is not a non-empty string. A verifier that does not hold the original cannot evaluate the rule. If it accepts such a reversal, that is its own policy decision, not the result of this check. The reference implementation applies the rule when it is given the originals it holds: `verify_receipt(r, originals={receipt_id: receipt, ...})`. Vector `29-reversal-issuer-mismatch` reverses vector 01 under a different issuer's key and is rejected by a verifier that holds vector 01.
 
 ### 4.3 Action category enumeration
 
@@ -215,8 +227,10 @@ A verifier **MUST**:
 3. Compute the canonical string `C` per §6.1.
 4. Decode the `signature` base64 to 64 bytes.
 5. Verify the Ed25519 signature over `C` using the resolved public key. **MUST** reject if verification fails.
-6. Check that `issued_at` is within the accept window (default ±300 s).
+6. Freshness (§3.3). When accepting the receipt as a live event, check that `issued_at` is within the accept window (default ±300 s, inclusive) of the verifier's current time, and reject it as stale or forward-dated otherwise. When verifying after the fact, do not apply a window around the current time; check against an independently evidenced instant if one is available.
 7. If `previous_receipt_hash` is present, fetch the prior receipt by its `receipt_id` (which **MUST** be discoverable in the issuer log) and verify that `sha256(<canonical bytes of prior receipt incl. its signature, excl. detached witness evidence>)` (§6.4) equals the declared hash. **MUST** reject if the hash does not match.
+
+If `action.reversal_of_receipt_id` is present and the verifier holds the original receipt, it **MUST** also apply the reversal issuer rule (§4.2).
 
 A verifier **SHOULD** additionally:
 
@@ -334,7 +348,7 @@ Receipts are signed by the issuer, not the principal. A compromised issuer key c
 
 ### 11.2 Replay
 
-`receipt_id` uniqueness, `issued_at` window enforcement (default ±300 s), and (when present) the `previous_receipt_hash` chain together prevent replay as a duplicate event. Verifiers **MUST** maintain a bounded `(issuer_did, receipt_id)` set with TTL ≥ 600 s and reject duplicates.
+`receipt_id` uniqueness, the `issued_at` window applied when a receipt is accepted as a live event (§3.3, default ±300 s), and (when present) the `previous_receipt_hash` chain together prevent replay as a duplicate event. Verifiers **MUST** maintain a bounded `(issuer_did, receipt_id)` set with TTL ≥ 600 s and reject duplicates. The window does not apply to after-the-fact verification (§3.3), so replay protection for archived receipts rests on the seen-set, the hash chain, and the log, not on the timestamp.
 
 ### 11.3 Hash-chain tampering
 
@@ -434,7 +448,8 @@ A purchase action by a member agent on behalf of a human principal:
 
 - core categories (`purchase`, `message_sent`, `decision_made`, `data_shared`, `record_filed`, `attestation_issued`, `vote_cast`)
 - positive: signature verifies; schema passes; hash chain links
-- negative: forged signature, tampered body, wrong hash chain, oversized `human_summary`, invalid `principal_did`, missing required field, mismatched `reversal_of_receipt_id` issuer
+- negative: forged signature, tampered body, wrong hash chain, oversized `human_summary`, invalid `principal_did`, missing required field, mismatched `reversal_of_receipt_id` issuer (`29`, run with the positive corpus as the originals the verifier holds)
+- freshness (§3.3): stale and forward-dated `issued_at` (`26`, `27`) and the inclusive window edge (`28`), each carrying a `verifier_now` reference instant; vectors without `verifier_now` are verified after the fact, with no window
 - forward-compat: unknown extension key (tolerant verifier accepts), unknown category (strict rejects, tolerant accepts as `other`)
 - accessibility: receipts with `alt_summaries` for multiple languages, `requires_review=true`
 - jurisdiction: GDPR-tagged data_shared, multi-jurisdiction data_residency

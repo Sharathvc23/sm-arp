@@ -37,7 +37,9 @@ NANDA_TRACE = REPO_ROOT / "nanda" / "nanda_interaction_trace.json"
 class VectorMeta:
     vector_id: str
     description: str
-    expected_outcome: str  # verify_pass | schema_fail | signature_fail | hash_chain_fail
+    # verify_pass | schema_fail | signature_fail | freshness_fail | reversal_fail
+    # | hash_chain_fail
+    expected_outcome: str
     verifier_mode: str  # strict | tolerant
     path: Path
 
@@ -84,6 +86,18 @@ def chain_priors() -> dict[str, dict]:
         receipt = meta.load()["receipt"]
         priors[compute_chain_link(receipt)] = receipt
     return priors
+
+
+def originals() -> dict[str, dict]:
+    """Map receipt_id → receipt over the positive corpus: the originals a verifier
+    holds for the spec §4.2 reversal-issuer check (mirrors test_arp_v01.py)."""
+    out: dict[str, dict] = {}
+    for meta in list_vectors():
+        if meta.expected_outcome != "verify_pass":
+            continue
+        receipt = meta.load()["receipt"]
+        out[receipt["receipt_id"]] = receipt
+    return out
 
 
 # ── the demo spine ─────────────────────────────────────────────────

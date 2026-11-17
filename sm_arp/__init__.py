@@ -23,6 +23,7 @@ from importlib.metadata import version as _dist_version
 from .identity import Identity, did_from_sk, gen_key, pubkey_from_did
 from .receipts import (
     ARP_VERSION,
+    DEFAULT_MAX_SKEW_SECONDS,
     KNOWN_CATEGORIES,
     KNOWN_TOP_LEVEL_MEMBERS,
     OUTCOMES,
@@ -40,8 +41,10 @@ from .receipts import (
     render,
     verify_authority_chain,
     verify_direct_grant,
+    verify_freshness,
     verify_hash_chain,
     verify_receipt,
+    verify_reversal,
     verify_signature,
 )
 from .store import AgencyLog, IssuerLog, ReceiptLog
@@ -65,6 +68,7 @@ except _PackageNotFoundError:  # running from a source tree, not installed
 
 __all__ = [
     "ARP_VERSION",
+    "DEFAULT_MAX_SKEW_SECONDS",
     "KNOWN_CATEGORIES",
     "KNOWN_TOP_LEVEL_MEMBERS",
     "OUTCOMES",
@@ -90,7 +94,9 @@ __all__ = [
     "render",
     "verify_authority_chain",
     "verify_direct_grant",
+    "verify_freshness",
     "verify_hash_chain",
     "verify_receipt",
+    "verify_reversal",
     "verify_signature",
 ]

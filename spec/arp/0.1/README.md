@@ -34,7 +34,7 @@ As agents move from chat-only assistants to systems that purchase, file, decide,
 
 - **Spec:** Complete draft. Reviewable.
 - **Schemas:** Complete draft.
-- **Vectors:** 25 vectors covering core action categories, hash-chain semantics, negative cases, and edge cases.
+- **Vectors:** 29 vectors covering core action categories, hash-chain semantics, `issued_at` freshness, the reversal issuer rule, negative cases, and edge cases.
 - **Conformance harness:** `conformance/arp/test_arp_v01.py` — framework-agnostic; any runtime in any language passes the same vectors.
 
 This protocol is **published-spec-first** via [labs.stellarminds.ai/arp](https://labs.stellarminds.ai/arp), not submitted to an external standards body. The signed conformance badge is produced by [`sm-conformance`](https://github.com/Sharathvc23/sm-conformance); see `governance.md` for the path to publication.

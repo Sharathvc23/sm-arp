@@ -1,0 +1,26 @@
+{
+  "id": "26-stale-issued-at",
+  "description": "Validly signed, but issued_at is 301 s before verifier_now. A verifier accepting it as a live event at verifier_now with the default ±300 s window MUST reject it as stale. Without a reference instant (after-the-fact audit) it verifies.",
+  "spec_ref": "spec.md §3.3, §6.3 step 6",
+  "expected_outcome": "freshness_fail",
+  "verifier_mode": "strict",
+  "verifier_now": "2026-05-21T21:20:01Z",
+  "private_keys": {
+    "issuer": "YXJwLXZlY3Rvci1pc3N1ZXItc2VlZC0zMmJ5dGVzISE=",
+    "principal": "YXJwLXZlY3Rvci1wcmluY2lwYWwtc2VlZC0zMmJ5ISE="
+  },
+  "receipt": {
+    "version": "arp/0.1",
+    "receipt_id": "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b",
+    "issuer_did": "did:key:z6MknLMN7r9U5Fqz948FjanHTZNWAeKitKXig1dbC2Le3hn3",
+    "principal_did": "did:key:z6MkhmkanDrL2wpF7VmmcRZC3nWWtJwtT8BboZU4HaZ3cXuX",
+    "issued_at": "2026-05-21T21:15:00Z",
+    "action": {
+      "category": "message_sent",
+      "human_summary": "Sent the signed lease back to the landlord.",
+      "outcome": "completed",
+      "counterparty_did": "did:key:z6MkkjfwJUSqmSB49ZaMWLuwPtmn9X4ZnZ4B6yPnfDE5cXKp"
+    },
+    "signature": "7z1Zg9lRZAaiemm53Q2Uhrv2/0oYos0UKuOh5TdeFl13wq2QFOx38hMCutccD8dfKvgyyNVgBvpGZRZTSUvCDw=="
+  }
+}
