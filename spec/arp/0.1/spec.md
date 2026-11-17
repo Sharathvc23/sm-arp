@@ -338,7 +338,9 @@ Receipts contain potentially sensitive information. The protocol defines three v
 | Counterparty-visible (default) | `receipt_id`, `issuer_did`, `issued_at`, `action.category`, `action.outcome`, `action.amount`, `signature` | the counterparty named in `action.counterparty_did` |
 | Public (opt-in) | none by default | nobody, unless principal explicitly publishes |
 
-The principal **MAY** publish receipts (e.g., for proof-of-work portfolios, public attestations, transparency reports). The runtime publishing tool **MUST** support a "redacted publish" mode that strips `human_summary`, `machine_payload`, `evidence`, and `accessibility.alt_summaries` while preserving the signature over the original canonical string. (This is achievable because JCS canonicalization is deterministic — the signature continues to verify against the original, redacted receipts include both the redacted body and the unmodified signature.)
+The signature covers the whole receipt. It is computed over the canonical string `C` of every member except `signature` and the detached `evidence.witness_signatures` (§6.1). A view that shows only some members, such as the counterparty-visible tier above, is therefore an **excerpt**. The excerpt does not verify on its own: §6.3 step 5 recomputes `C` from the members present, so any removed member makes the signature fail. A holder can check an excerpt only by obtaining the full receipt, verifying it, and comparing the shown members against it.
+
+The principal **MAY** publish receipts (e.g., for proof-of-work portfolios, public attestations, transparency reports), either whole or as a redacted excerpt that omits members such as `human_summary`, `machine_payload`, `evidence`, or `accessibility.alt_summaries`. A whole receipt stays verifiable. A redacted excerpt does not: in v0.1 it is an unsigned statement by the publisher, even if it reproduces the original `signature` value. Publishing tools **MUST NOT** present a redacted excerpt as signature-verifiable. v0.1 defines no selective-disclosure scheme that would let a signature cover a partial receipt (see §18).
 
 ## 11. Security considerations
 
@@ -464,17 +466,33 @@ The suite is intentionally framework-agnostic — it loads vectors and verifies 
 
 ## 16. Relationship to the Attested Action Envelope (AAE)
 
-ARP and the Attested Action Envelope (AAE) are **complementary** per-action evidence primitives, not competitors. They address different audiences and carry different properties:
+*This section is non-normative.*
 
-- An **ARP receipt** is the *human-facing* record: a one-sentence `human_summary`, an `authority_chain` binding the action to a delegated grant, held by the represented human, a regulator, or an insurer. Its tamper-evidence is the per-issuer forward hash chain (§6.4).
-- An **AAE envelope** is the *substrate* evidence record: the `action` / `decision` / `belief` / `checkpoint` kinds, rendered by operator surfaces, with `checkpoint` envelopes anchoring **bidirectional** (forward + reverse merkle-inclusion) audit over the envelopes in scope.
+The Attested Action Envelope (AAE), as specified and implemented by [`sm-aae`](https://github.com/Sharathvc23/sm-aae) (AAE SPEC v0.1, working draft), records a **pre-action authorization verdict**. Before an agent acts, a policy decides, and the issuer signs a JSON object with exactly eight members:
 
-The two compose through a defined seam:
+| Member | Meaning |
+|---|---|
+| `agent_id` | the acting agent's identity, a free-form string |
+| `action` | `{verb, resource, params}`, what the agent asked to do |
+| `policy_id` | the policy entry that produced the verdict |
+| `outcome` | `authorized`, `denied` or `conditional`; refusals are signed too |
+| `prev_hash` | hex SHA-256 of the agent's previous signed envelope, or `null` for its first |
+| `issued_at` | RFC 3339 timestamp |
+| `sig` | hex Ed25519 signature over the sorted-key, compact JSON of the other seven members |
+| `pubkey` | hex of the raw 32-byte Ed25519 public key |
 
-1. An ARP receipt's `evidence` **MAY** reference the AAE envelope(s) that substantiate the action — by the envelope's content hash — so a verifier can cross-walk from the human's receipt to the substrate evidence.
-2. An AAE `checkpoint` **MAY** include ARP receipts among the records it commits to, so the bidirectional audit AAE provides extends to ARP receipts without ARP defining its own merkle layer.
+An ARP receipt and an AAE envelope therefore record different moments. The envelope records what an agent was permitted or refused, before it acted. The receipt records what it did, for whom, and with what outcome, afterwards. They are independent formats:
 
-ARP therefore **MUST NOT** define a bidirectional (checkpoint/merkle) audit mechanism of its own — when reverse-audit anchoring is required, an implementation relies on AAE via the seam above. Conversely, AAE carries no `human_summary` or `authority_chain`; those remain ARP's. An implementation **MAY** emit both for a single action — an ARP receipt for the human, an AAE envelope for the substrate — linked by the evidence reference. Neither primitive is redundant: each owns what the other deliberately omits.
+| | ARP receipt | AAE envelope (sm-aae) |
+|---|---|---|
+| When issued | after the action | before the action |
+| Signer identity | `issuer_did` (`did:key`), plus `principal_did` | `agent_id` (any string) + `pubkey` (raw hex key); no principal |
+| Canonical form / signature | RFC 8785 JCS; base64 Ed25519 | sorted-key compact JSON; hex Ed25519 |
+| Per-signer chain | `previous_receipt_hash` = `sha256:<hex>` over §6.4 bytes | `prev_hash` = 64-hex SHA-256 of the full signed envelope |
+
+**What holds today.** Neither format references the other. No ARP member carries an AAE envelope or its hash, and nothing in sm-aae carries an ARP receipt. sm-aae has no envelope kinds beyond the single verdict shape, no checkpoint envelope, and no Merkle commitment. Nothing ties an envelope's `agent_id`/`pubkey` to a receipt's `issuer_did`. An issuer that keeps both records may note an envelope's hash among the receipt's free-form `evidence.external_refs` (§5). ARP verifiers do not dereference or check that string.
+
+**Future work (not specified, not implemented).** A defined binding between the two is open (§18). Candidates include a typed `evidence` member that names an AAE envelope by hash, a rule tying an envelope's signing key to the receipt's `issuer_did`, and a checkpoint or Merkle commitment covering receipts and envelopes together. Until one is specified, ARP's own tamper-evidence is the per-issuer hash chain (§6.4), plus the checkpoint recommendation in §11.3.
 
 ## 17. Governance and stewardship
 
@@ -488,6 +506,8 @@ See [`governance.md`](./governance.md) for the change process, the contributor a
 - **Multi-principal actions.** What if an agent acts on behalf of two humans (couple booking joint flight)? v0.1 mandates a single `principal_did`; v0.2 may extend.
 - **MCP tool-invocation correlation.** `evidence.tool_invocations` is sketched; v0.2 should define a canonical join key between an MCP server's audit log and an ARP receipt.
 - **EU AI Act mapping.** The Act's Article 13 transparency provisions land 2027; v0.2 **SHOULD** include a normative mapping appendix showing how a complete ARP receipt satisfies each Article 13 sub-clause.
+- **Selective disclosure.** v0.1 signatures cover the whole receipt, so a redacted excerpt does not verify (§10.3). A scheme that lets a holder disclose some members and keep a verifiable signature is not defined.
+- **ARP ↔ AAE binding.** Whether and how a receipt names the AAE verdict that authorized its action, how the two signer identities are tied, and whether a shared checkpoint covers both (§16).
 
 ---
 

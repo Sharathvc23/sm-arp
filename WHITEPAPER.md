@@ -135,7 +135,7 @@ The property that makes this *verifiable* reputation rather than asserted reputa
 
 [Project NANDA](https://projectnanda.org) defines four pillars the open Internet of Agents must solve: **DNS** (discovery), **CA** (decentralized identity), **Orchestration** (routing), and **Attestation** (verifiable evidence). ARP contributes verifiable, per-action, human-facing evidence of what agents do under delegated authority — complementing NANDA's per-*credential* primitives (AgentFacts describes what an agent *is*; KYA attests *who vouches* for it; an ARP receipt records what it *did* for a human).
 
-> **Relationship to AAE — complementary.** The Attested Action Envelope (AAE), rendered by the operator surfaces, is also a per-action signed envelope. ARP and AAE are **complementary, not competing**: ARP is the *human-facing* receipt (one-sentence summary, authority chain, forward hash chain), AAE the *substrate* evidence record (four envelope kinds, bidirectional merkle-checkpoint audit). They compose through a defined seam — an ARP receipt's `evidence` references the AAE envelope(s) that substantiate the action, and an AAE `checkpoint` may cover ARP receipts, so ARP relies on AAE for reverse-audit anchoring rather than growing its own merkle layer. Neither is redundant: each owns what the other deliberately omits. The normative seam is `spec.md` §16.
+> **Relationship to AAE.** The Attested Action Envelope, as [`sm-aae`](https://github.com/Sharathvc23/sm-aae) implements it, is a signed **pre-action authorization verdict**: eight members (`agent_id`, `action{verb, resource, params}`, `policy_id`, `outcome` ∈ `authorized`/`denied`/`conditional`, `prev_hash`, `issued_at`, `sig`, `pubkey`), chained per agent by `prev_hash`. It records what an agent was permitted or refused before acting. An ARP receipt records what the agent did, for a human, afterwards. The two are independent formats today. Neither references the other, sm-aae has no envelope kinds, checkpoints or Merkle commitments, and nothing ties an envelope's key to a receipt's `issuer_did`. A defined binding between them is future work. See `spec.md` §16.
 
 ## 10. Future Work
 
@@ -144,7 +144,7 @@ Items deferred from v0.1, in rough priority order:
 1. **The Delegated Authority Token (DAT) companion**, promoted from sketch (`dat-companion.md`) to a normative spec the authority chain references.
 2. **Richer action categories.** Sub-payload shapes for specific action classes (purchase, transfer, agreement), kept additive to the base receipt.
 3. **A normative reputation profile.** The model in §8 ships as the `sm_arp.vrp` library; promote it to a published profile spec alongside the receipt spec, with its own conformance vectors.
-4. **Resolving the ARP ↔ AAE relationship** (§9) — convergence, complement, or clean separation — ahead of v1.0.
+4. **An ARP ↔ AAE binding** (§9, `spec.md` §16): whether a receipt names the sm-aae verdict that authorized its action, how the two signer identities are tied, and whether a shared checkpoint covers both. None of this exists yet.
 5. **Published-spec governance** via `labs.stellarminds.ai/arp`, with the conformance registry operated alongside.
 
 ## 11. Related Packages
@@ -153,6 +153,7 @@ Items deferred from v0.1, in rough priority order:
 |---|---|
 | [`sm-conformance`](https://github.com/Sharathvc23/sm-conformance) | The conformance substrate ARP points at for its badge |
 | [`sm-locp`](https://github.com/Sharathvc23/sm-locp) | Open Compliance Protocol — what an agent is *permitted* to do; ARP records what it *did* |
+| [`sm-aae`](https://github.com/Sharathvc23/sm-aae) | Attested Action Envelope: a signed pre-action authorization verdict, chained per agent (see §9) |
 | [`sm-attest-viewer`](https://github.com/Sharathvc23/sm-attest-viewer) | Renderer for AAE action-envelope chains (complementary to ARP — see §8) |
 
 ---
