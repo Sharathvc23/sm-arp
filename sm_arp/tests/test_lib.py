@@ -4,7 +4,7 @@ ROUND-TRIP   issue → verify accepts
 TAMPER       any post-sign mutation fails at the signature stage
 HASH-CHAIN   linked receipts verify; a broken link is rejected
 AUTHORITY    a granted action verifies; out-of-scope is rejected
-STORE        append → query round-trips; idempotent on (issuer, receipt_id)
+STORE        append → query round-trips; re-appending the same receipt is a no-op
 CORPUS       verify_receipt agrees with every canonical vector's documented verdict
 NO-DRIFT     verify_receipt agrees with the conformance verifier on every vector
 
@@ -166,7 +166,7 @@ def test_store_round_trip_and_idempotent(tmp_path: Path) -> None:
     r = issue_receipt(me, principal_did=other.did, action=_action())
     link = log.append(r)
     assert link == chain_link(r)
-    log.append(r)  # idempotent on (issuer, receipt_id)
+    assert log.append(r) == link  # re-appending the same receipt is a no-op
     assert log.count() == 1
     assert log.list_for_principal(other.did)[0]["receipt_id"] == r["receipt_id"]
     assert log.list_for_issuer(me.did)[0]["receipt_id"] == r["receipt_id"]

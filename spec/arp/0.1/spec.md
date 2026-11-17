@@ -324,7 +324,7 @@ The Agency Log is the canonical reference for "what my agent did on my behalf." 
 
 ### 10.2 Issuer Log
 
-The **Issuer Log** is the agent's audit-side store. It **SHOULD** be hash-chained (see §6.4) for tamper-evidence. Chapters or platforms **MAY** operate an Issuer Log on behalf of their member agents. The Issuer Log is the canonical reference under audit, regulatory inquiry, or insurance dispute.
+The **Issuer Log** is the agent's audit-side store. It **SHOULD** be hash-chained (see §6.4) for tamper-evidence. Chapters or platforms **MAY** operate an Issuer Log on behalf of their member agents. The Issuer Log is the canonical reference under audit, regulatory inquiry, or insurance dispute. The reference implementation's `IssuerLog` refuses to store a receipt that would rewrite one it holds (same `issuer_did` and `receipt_id`, different signed content), fork the issuer's chain (a second successor to one predecessor), or fail to extend the issuer's current head. Its `AgencyLog`, which holds only part of each issuer's chain, refuses rewrites and forks.
 
 Receipts **MUST** be retrievable by `receipt_id` from at least one of these stores. Best practice: both, with periodic reconciliation (the divergence between them is itself audit-grade evidence).
 

@@ -47,7 +47,7 @@ from .receipts import (
     verify_reversal,
     verify_signature,
 )
-from .store import AgencyLog, IssuerLog, ReceiptLog
+from .store import AgencyLog, AppendRefused, IssuerLog, ReceiptLog
 
 # Derived from installed distribution metadata, never hand-maintained.
 #
@@ -74,6 +74,7 @@ __all__ = [
     "OUTCOMES",
     "VERIFIER_MODES",
     "AgencyLog",
+    "AppendRefused",
     "Identity",
     "IssuerLog",
     "ReceiptLog",
