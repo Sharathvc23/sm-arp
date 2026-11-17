@@ -34,7 +34,9 @@ signature or chain link changes; the 25 existing vectors are byte-identical.
     possibly out-of-order chains.
   - malformed key fields (non-string ids, a `previous_receipt_hash` that is present
     but not `sha256:<64 hex>`) are refused instead of raising `KeyError` or a SQLite
-    binding error.
+    binding error. This includes an explicit `"previous_receipt_hash": null`: spec
+    §6.4 says a genesis receipt omits the field, so the log refuses it as
+    `malformed`, although `verify_receipt` still accepts such a receipt.
   - refusals raise the new `AppendRefused(ValueError)`, with `.reason` set to
     `malformed`, `rewrite`, `fork` or `discontinuity`.
   **Behaviour change:** code that relied on `append` overwriting a stored receipt,
