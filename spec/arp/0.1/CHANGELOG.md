@@ -3,6 +3,43 @@
 The wire identifier is `arp/0.1` and, per `governance.md` §1 ("Versioning"), remains a
 fluid working draft until v0.1 RC: changes accumulate here against the latest `main`.
 
+## Unreleased — verifier MUSTs that can be checked; claims corrected
+
+No receipt bytes, signatures, canonicalization or chain links change, and no
+existing vector changed. Verifier-side rules are made checkable, and two
+descriptions are corrected to what holds.
+
+- **§3.3, §6.3 step 6, §11.2: `issued_at` freshness has an explicit reference
+  instant.** The old text required every verifier to reject a receipt more than
+  ±300 s from *its current time*. That cannot hold for after-the-fact verification:
+  every archived receipt, and every vector in this corpus, eventually falls outside
+  that window. Now a verifier accepting a receipt as a live event MUST apply the
+  window around its current time (default ±300 s, inclusive; stale and
+  forward-dated). A verifier checking after the fact MUST NOT reject a receipt for
+  being old, and MAY check against an independently evidenced instant. Vectors
+  may carry `verifier_now`.
+- **§4.2, §6.3: reversal issuer rule spelled out.** A verifier that holds the
+  original MUST confirm its `receipt_id`, authenticate its signature, and require
+  its `issuer_did` to equal the reversal's. It MUST also reject a self-reversal or a
+  non-string reference. Without the original, the rule cannot be evaluated.
+- **§10.3: redacted publish no longer claims a verifiable signature.** The signature
+  covers the whole receipt (§6.1), so a redacted excerpt, or the counterparty
+  tier's subset, does not verify. Publishing tools MUST NOT present one as
+  verifiable. Selective disclosure is listed as open (§18).
+- **§16: AAE described as sm-aae implements it.** AAE is an 8-member pre-action
+  verdict (`agent_id`, `action{verb,resource,params}`, `policy_id`, `outcome`,
+  `prev_hash`, `issued_at`, `sig`, `pubkey`). The previous text described envelope
+  kinds (`action`/`decision`/`belief`/`checkpoint`), Merkle checkpoints and an
+  ARP↔AAE seam. None of these exist. The section is now non-normative. Its
+  former `MUST NOT` (that ARP not define its own checkpoint mechanism, relying on
+  AAE's) is removed, because the mechanism it relied on does not exist. A binding
+  is listed as future work.
+- **§10.2:** notes the reference `IssuerLog` / `AgencyLog` append rules.
+- **Vectors:** `26-stale-issued-at`, `27-forward-dated-issued-at` (freshness_fail),
+  `28-fresh-at-window-edge` (verify_pass at exactly 300 s),
+  `29-reversal-issuer-mismatch` (reversal_fail). 25 → 29 vectors; the suite digest
+  changes accordingly.
+
 ## v0.1.1 — detached witness evidence (audit 2026-11)
 
 Driven by the 2026-11 audit of the reference implementation and its consumers

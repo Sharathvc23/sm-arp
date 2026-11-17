@@ -34,7 +34,13 @@ A **conformant ARP runtime** is one that:
 2. Computes signatures per `spec.md` §6 such that every positive vector in
    `vectors/arp/0.1/` verifies.
 3. Rejects every negative vector in `vectors/arp/0.1/` at the documented stage
-   (schema, signature, hash chain, etc.).
+   (schema, signature, freshness, reversal, hash chain, etc.).
+
+Two inputs come from the run, not the receipt. A vector that carries a
+`verifier_now` member is verified as a live event at that instant, with the
+default ±300 s `issued_at` window (`spec.md` §3.3); a vector without one is
+verified after the fact, with no window. The positive vectors are the originals
+the verifier holds for the reversal-issuer rule (`spec.md` §4.2).
 
 The ARP conformance suite is `conformance/arp/` — it loads the vectors and
 checks a runtime against (1)–(3). It is framework-agnostic: no NANDA-specific

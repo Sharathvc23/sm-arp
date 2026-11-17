@@ -9,10 +9,11 @@ The vectors exercise:
   - Every core action category
   - Optional sub-objects (evidence, jurisdiction, accessibility)
   - Hash-chain semantics (genesis + linked)
-  - Reversal flow
+  - Reversal flow, and a reversal by an issuer other than the original's
   - Forward-compatibility (extensions, unknown category in tolerant mode)
+  - Freshness of ``issued_at`` against a ``verifier_now`` reference instant
   - Negative cases (tampered signature, broken chain, oversized summary,
-    invalid version, invalid DID)
+    invalid version, invalid DID, stale / forward-dated issued_at)
 
 Each output file is a JSON document with this shape::
 
@@ -21,9 +22,15 @@ Each output file is a JSON document with this shape::
       "description":      "<one-line>",
       "spec_ref":         "<section refs>",
       "expected_outcome": "verify_pass" | "schema_fail" | "signature_fail"
+                          | "freshness_fail" | "reversal_fail"
                           | "hash_chain_fail" | "version_unsupported"
                           | "tolerant_pass_strict_fail",
       "verifier_mode":    "strict" | "tolerant",
+      "verifier_now":     "<RFC 3339>"         # optional: the reference instant
+                                               # for the §3.3 freshness window
+                                               # (default ±300 s). Absent = the
+                                               # vector is verified after the
+                                               # fact and no window applies.
       "private_keys":     { issuer, principal }   # Ed25519 seed bytes b64,
                                                   # included so verifiers can
                                                   # reproduce or build variants
@@ -56,11 +63,13 @@ ISSUER_SEED = b"arp-vector-issuer-seed-32bytes!!"
 PRINCIPAL_SEED = b"arp-vector-principal-seed-32by!!"
 WITNESS_SEED = b"arp-vector-witness-seed-32bytes!"
 COUNTERPARTY_SEED = b"arp-vector-counterparty-seed32b!"
+OTHER_ISSUER_SEED = b"arp-vector-other-issuer-seed32b!"
 
 assert len(ISSUER_SEED) == 32
 assert len(PRINCIPAL_SEED) == 32
 assert len(WITNESS_SEED) == 32
 assert len(COUNTERPARTY_SEED) == 32
+assert len(OTHER_ISSUER_SEED) == 32
 
 
 # ── crypto helpers ─────────────────────────────────────────────────
@@ -134,11 +143,13 @@ ISSUER_SK, ISSUER_PK = keypair(ISSUER_SEED)
 PRINCIPAL_SK, PRINCIPAL_PK = keypair(PRINCIPAL_SEED)
 WITNESS_SK, WITNESS_PK = keypair(WITNESS_SEED)
 COUNTERPARTY_SK, COUNTERPARTY_PK = keypair(COUNTERPARTY_SEED)
+OTHER_ISSUER_SK, OTHER_ISSUER_PK = keypair(OTHER_ISSUER_SEED)
 
 ISSUER_DID = did_key_from_pubkey(ISSUER_PK)
 PRINCIPAL_DID = did_key_from_pubkey(PRINCIPAL_PK)
 COUNTERPARTY_DID = did_key_from_pubkey(COUNTERPARTY_PK)
 WITNESS_DID = did_key_from_pubkey(WITNESS_PK)
+OTHER_ISSUER_DID = did_key_from_pubkey(OTHER_ISSUER_PK)
 
 
 def keys_b64() -> dict:
@@ -170,6 +181,7 @@ def emit(
     receipt: dict,
     verifier_mode: str = "strict",
     extra_keys: dict | None = None,
+    verifier_now: str | None = None,
 ) -> None:
     path = OUTPUT_DIR / f"{name}.json"
     body = {
@@ -178,9 +190,13 @@ def emit(
         "spec_ref": spec_ref,
         "expected_outcome": expected_outcome,
         "verifier_mode": verifier_mode,
-        "private_keys": {**keys_b64(), **(extra_keys or {})},
-        "receipt": receipt,
     }
+    # Only the freshness vectors carry a reference instant; every other vector is
+    # emitted byte-identically to before (no new member).
+    if verifier_now is not None:
+        body["verifier_now"] = verifier_now
+    body["private_keys"] = {**keys_b64(), **(extra_keys or {})}
+    body["receipt"] = receipt
     path.write_text(json.dumps(body, indent=2, ensure_ascii=False) + "\n")
     print(f"  wrote {path.relative_to(OUTPUT_DIR.parent.parent.parent)}")
 
@@ -852,6 +868,100 @@ def vector_25_unknown_top_level_member() -> None:
     )
 
 
+def _message_receipt(*, receipt_id: str, issued_at: str, human_summary: str) -> dict:
+    r = base_receipt(
+        receipt_id=receipt_id,
+        issued_at=issued_at,
+        category="message_sent",
+        human_summary=human_summary,
+    )
+    r["action"]["counterparty_did"] = COUNTERPARTY_DID
+    return sign_receipt(ISSUER_SK, r)
+
+
+def vector_26_stale_issued_at() -> None:
+    """issued_at 301 s before the verifier's reference instant: stale (§3.3)."""
+    r = _message_receipt(
+        receipt_id="0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b",
+        issued_at="2026-05-21T21:15:00Z",
+        human_summary="Sent the signed lease back to the landlord.",
+    )
+    emit(
+        "26-stale-issued-at",
+        "Validly signed, but issued_at is 301 s before verifier_now. A verifier accepting "
+        "it as a live event at verifier_now with the default ±300 s window MUST reject it "
+        "as stale. Without a reference instant (after-the-fact audit) it verifies.",
+        "spec.md §3.3, §6.3 step 6",
+        "freshness_fail",
+        r,
+        verifier_now="2026-05-21T21:20:01Z",
+    )
+
+
+def vector_27_forward_dated_issued_at() -> None:
+    """issued_at 301 s after the verifier's reference instant: forward-dated (§3.3)."""
+    r = _message_receipt(
+        receipt_id="0c0c0c0c-0c0c-4c0c-8c0c-0c0c0c0c0c0c",
+        issued_at="2026-05-21T21:30:00Z",
+        human_summary="Confirmed the plumber for Thursday morning.",
+    )
+    emit(
+        "27-forward-dated-issued-at",
+        "Validly signed, but issued_at is 301 s after verifier_now. The ±300 s window is "
+        "symmetric: a forward-dated receipt MUST be rejected like a stale one.",
+        "spec.md §3.3, §6.3 step 6",
+        "freshness_fail",
+        r,
+        verifier_now="2026-05-21T21:24:59Z",
+    )
+
+
+def vector_28_fresh_at_window_edge() -> None:
+    """issued_at exactly 300 s before the reference instant: inside the window (§3.3)."""
+    r = _message_receipt(
+        receipt_id="0d0d0d0d-0d0d-4d0d-8d0d-0d0d0d0d0d0d",
+        issued_at="2026-05-21T21:45:00Z",
+        human_summary="Told the school the kids will be picked up at 3pm.",
+    )
+    emit(
+        "28-fresh-at-window-edge",
+        "issued_at is exactly 300 s before verifier_now. The default window is inclusive, "
+        "so a live-acceptance verifier MUST accept it.",
+        "spec.md §3.3, §6.3 step 6",
+        "verify_pass",
+        r,
+        verifier_now="2026-05-21T21:50:00Z",
+    )
+
+
+def vector_29_reversal_issuer_mismatch() -> None:
+    """A different agent 'reverses' vector 01's purchase: §4.2 requires the reversal's
+    issuer to be the original's issuer."""
+    r = base_receipt(
+        receipt_id="0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e",
+        issued_at="2026-05-21T22:00:00Z",
+        category="purchase",
+        human_summary="Refunded the AMC Boston Common 19 ticket purchase ($34.50).",
+        outcome="reversed",
+    )
+    r["issuer_did"] = OTHER_ISSUER_DID
+    r["action"]["counterparty_did"] = COUNTERPARTY_DID
+    r["action"]["counterparty_label"] = "AMC Boston Common 19"
+    r["action"]["amount"] = {"currency": "USD", "cents": 3450}
+    r["action"]["reversal_of_receipt_id"] = "11111111-1111-4111-8111-111111111111"
+    sign_receipt(OTHER_ISSUER_SK, r)
+    emit(
+        "29-reversal-issuer-mismatch",
+        "Reversal of vector 01 signed by a different agent than vector 01's issuer. Its "
+        "own signature verifies; a verifier holding vector 01 MUST reject it because the "
+        "reversal's issuer is not the original's issuer.",
+        "spec.md §4.2",
+        "reversal_fail",
+        r,
+        extra_keys={"other_issuer": base64.b64encode(OTHER_ISSUER_SEED).decode("ascii")},
+    )
+
+
 def main() -> int:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Generating ARP v0.1 conformance vectors in {OUTPUT_DIR}\n")
@@ -883,8 +993,12 @@ def main() -> int:
     vector_23_witnessed_receipt()
     vector_24_witness_tampered()
     vector_25_unknown_top_level_member()
+    vector_26_stale_issued_at()
+    vector_27_forward_dated_issued_at()
+    vector_28_fresh_at_window_edge()
+    vector_29_reversal_issuer_mismatch()
 
-    print("\nDone. 25 vectors generated.")
+    print("\nDone. 29 vectors generated.")
     return 0
 
 

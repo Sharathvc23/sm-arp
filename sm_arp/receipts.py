@@ -6,8 +6,11 @@
 * attach a standard-base64 (padded) signature.
 
 Verification resolves ``issuer_did`` to a public key via did:key and checks the
-structural envelope, the signature, the optional ``previous_receipt_hash`` chain
-(§6.4), and the optional ``authority_chain`` back to a grant (§4.5).
+structural envelope and the signature, then — each only when the caller supplies
+the context it needs — ``issued_at`` freshness against a reference instant
+(§3.3), a reversal's issuer against the original it reverses (§4.2), the
+``authority_chain`` back to a grant (§4.5), and the ``previous_receipt_hash``
+chain (§6.4).
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ import base64
 import hashlib
 import re
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -42,6 +45,9 @@ KNOWN_CATEGORIES = {
     "authority_revoked", "other",
 }  # fmt: skip
 OUTCOMES = {"completed", "failed", "partial", "reversed", "pending"}
+
+# §3.3 — the default accept window around a verifier's reference instant.
+DEFAULT_MAX_SKEW_SECONDS = 300
 
 
 def new_receipt_id() -> str:
@@ -194,7 +200,8 @@ def issue_receipt(
 @dataclass
 class VerifyResult:
     ok: bool
-    stage: str  # structure | signature | authority_chain | hash_chain | accepted
+    # structure | signature | freshness | reversal | authority_chain | hash_chain | accepted
+    stage: str
     detail: str
 
     @classmethod
@@ -284,6 +291,109 @@ def _parse_rfc3339(value: object) -> datetime | None:
     except ValueError:
         return None
     return parsed if parsed.utcoffset() is not None else None
+
+
+def _check_window_args(now: datetime, max_skew_seconds: int) -> None:
+    """Reject a reference instant or window that would make the freshness check
+    meaningless. These are programming errors, so they raise instead of returning a
+    verdict: a naive ``now`` cannot be compared with an aware ``issued_at``, and a
+    negative or non-integer window (``True``, ``nan``) would silently accept or
+    reject everything."""
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise ValueError("now must be a timezone-aware datetime")
+    if (
+        isinstance(max_skew_seconds, bool)
+        or not isinstance(max_skew_seconds, int)
+        or max_skew_seconds < 0
+    ):
+        raise ValueError(f"max_skew_seconds must be a non-negative int, got {max_skew_seconds!r}")
+
+
+def verify_freshness(
+    r: dict[str, Any],
+    *,
+    now: datetime,
+    max_skew_seconds: int = DEFAULT_MAX_SKEW_SECONDS,
+) -> VerifyResult:
+    """§3.3 / §6.3 step 6: is ``issued_at`` within ``max_skew_seconds`` of ``now``?
+
+    ``now`` is the verifier's reference instant. When a receipt is accepted as a
+    live event (a log ingesting it, a counterparty acting on it) that is the
+    verifier's current time. When a receipt is checked after the fact (audit,
+    dispute, archival re-verification) the current time is the wrong reference,
+    because every receipt eventually falls outside a window around it. Such a
+    verifier either skips this check or passes an instant it has independent
+    evidence for, such as when its log first recorded the receipt. The window is
+    inclusive, and it rejects both stale and forward-dated receipts.
+    """
+    _check_window_args(now, max_skew_seconds)
+    issued = _parse_rfc3339(r.get("issued_at"))
+    if issued is None:
+        return VerifyResult(
+            False, "freshness", "issued_at is not an RFC 3339 timestamp with a UTC offset"
+        )
+    # total_seconds() keeps the comparison in floats, so a huge window cannot overflow
+    # a timedelta.
+    skew = (issued - now).total_seconds()
+    if skew > max_skew_seconds:
+        return VerifyResult(
+            False,
+            "freshness",
+            f"issued_at is {skew:.0f}s after the reference instant "
+            f"(forward-dated; window ±{max_skew_seconds}s)",
+        )
+    if -skew > max_skew_seconds:
+        return VerifyResult(
+            False,
+            "freshness",
+            f"issued_at is {-skew:.0f}s before the reference instant "
+            f"(stale; window ±{max_skew_seconds}s)",
+        )
+    return VerifyResult.accepted()
+
+
+def verify_reversal(r: dict[str, Any], originals: Mapping[str, dict[str, Any]]) -> VerifyResult:
+    """§4.2: a reversal's issuer must be the issuer of the receipt it reverses.
+
+    ``originals`` holds the receipts the verifier has, keyed by ``receipt_id``. The
+    rule can only be checked against an original the verifier holds:
+
+    * a receipt without ``action.reversal_of_receipt_id`` passes (not a reversal);
+    * a reversal whose original is not in ``originals`` passes. The rule cannot
+      be evaluated, and a caller that needs the original to be present checks
+      ``reversal_of_receipt_id in originals`` itself;
+    * a held original is authenticated before it is compared. Its index key must
+      equal its own ``receipt_id`` and its Ed25519 signature must verify under its
+      own ``issuer_did``. Then its ``issuer_did`` must equal ``r``'s.
+
+    A reversal that names its own ``receipt_id`` fails, since a receipt cannot
+    reverse itself.
+    """
+    action = r.get("action")
+    if not isinstance(action, dict) or "reversal_of_receipt_id" not in action:
+        return VerifyResult.accepted()
+    target = action["reversal_of_receipt_id"]
+    if not isinstance(target, str) or not target:
+        return VerifyResult(False, "reversal", "reversal_of_receipt_id is not a non-empty string")
+    if target == r.get("receipt_id"):
+        return VerifyResult(False, "reversal", "receipt names itself as the receipt it reverses")
+    if target not in originals:
+        return VerifyResult.accepted()  # original not held: rule cannot be evaluated
+    original = originals[target]
+    if not isinstance(original, dict):
+        return VerifyResult(False, "reversal", f"original {target} is not a receipt object")
+    if original.get("receipt_id") != target:
+        return VerifyResult(
+            False, "reversal", f"originals index key {target} does not match its receipt_id"
+        )
+    authentic = verify_signature(original)
+    if not authentic.ok:
+        return VerifyResult(False, "reversal", f"original {target} signature: {authentic.detail}")
+    if original.get("issuer_did") != r.get("issuer_did"):
+        return VerifyResult(
+            False, "reversal", f"reversal issuer is not the issuer of original {target}"
+        )
+    return VerifyResult.accepted()
 
 
 def dat_digest(dat: dict[str, Any]) -> str:
@@ -442,19 +552,43 @@ def verify_receipt(
     grants: dict[str, dict[str, Any]] | None = None,
     prior: dict[str, Any] | None = None,
     check_chain: bool = False,
+    now: datetime | None = None,
+    max_skew_seconds: int | None = None,
+    originals: Mapping[str, dict[str, Any]] | None = None,
 ) -> VerifyResult:
     """Verify a receipt: structure → signature, then the opt-in stages.
 
     By default only the structural envelope (§3) and the issuer's Ed25519
-    signature (§6.3) are checked. The authority chain (§4.5) is checked only when
-    a ``grants`` index is supplied, and the hash chain (§6.4) only when
-    ``check_chain=True`` (with ``prior`` being the predecessor, or ``None`` for a
-    genesis receipt). ``mode`` is ``"strict"`` (default) or ``"tolerant"``; any
-    other value is a programming error and raises ``ValueError`` rather than
-    silently weakening verification.
+    signature (§6.3) are checked. Each other stage needs context the receipt does
+    not carry, so each runs only when the caller supplies that context, in this
+    order:
+
+    * **freshness** (§3.3, §6.3 step 6), when ``now`` is given: ``issued_at`` must
+      be within ``max_skew_seconds`` (default 300) of ``now``. Pass the current
+      time when accepting a receipt as a live event. Omit ``now`` when
+      re-verifying an old receipt for audit, or pass an independently evidenced
+      instant. See :func:`verify_freshness`.
+    * **reversal** (§4.2), when ``originals`` is given: a reversal's issuer must
+      equal the issuer of the original it reverses, if the verifier holds that
+      original. See :func:`verify_reversal`.
+    * **authority chain** (§4.5), when a ``grants`` index is given.
+    * **hash chain** (§6.4), when ``check_chain=True``, with ``prior`` being the
+      predecessor or ``None`` for a genesis receipt.
+
+    ``mode`` is ``"strict"`` (default) or ``"tolerant"``. Any other value is a
+    programming error and raises ``ValueError`` rather than silently weakening
+    verification. So do a naive ``now``, a negative or non-integer
+    ``max_skew_seconds``, and a ``max_skew_seconds`` given without ``now`` (it
+    would otherwise look like a freshness check that never runs).
     """
     if mode not in VERIFIER_MODES:
         raise ValueError(f"unknown verifier mode {mode!r}; expected one of {VERIFIER_MODES}")
+    window = DEFAULT_MAX_SKEW_SECONDS if max_skew_seconds is None else max_skew_seconds
+    if now is None:
+        if max_skew_seconds is not None:
+            raise ValueError("max_skew_seconds has no effect without now")
+    else:
+        _check_window_args(now, window)
     strict = mode == "strict"
     structural = _check_structure(r, strict=strict)
     if structural is not None:
@@ -462,6 +596,14 @@ def verify_receipt(
     sig = verify_signature(r)
     if not sig.ok:
         return sig
+    if now is not None:
+        fresh = verify_freshness(r, now=now, max_skew_seconds=window)
+        if not fresh.ok:
+            return fresh
+    if originals is not None:
+        reversal = verify_reversal(r, originals)
+        if not reversal.ok:
+            return reversal
     if grants is not None:
         chain = verify_authority_chain(r, grants)
         if not chain.ok:

@@ -57,7 +57,11 @@ A Receipt is a JSON object. Unknown members at the top level **MUST** be rejecte
 ### 3.3 Field-level constraints
 
 - `version`, `receipt_id`, `issuer_did`, `principal_did`, `issued_at`, and `signature` **MUST** be non-empty strings.
-- `issued_at` **MUST** be within the verifier's accept window (default ±300 seconds from the verifier's current time, configurable per deployment). Outside this window the receipt **MUST** be rejected as stale.
+- `issued_at` freshness is checked against a **reference instant** the verifier supplies. The receipt does not carry one, and the right instant depends on why the receipt is being verified:
+  - A verifier that accepts a receipt **as a live event** (an Issuer Log or Agency Log ingesting it, a counterparty or downstream agent acting on it) **MUST** use its current time as the reference instant. It **MUST** reject the receipt as stale or forward-dated when `issued_at` is outside its accept window around that instant. The window defaults to ±300 seconds, inclusive, and is configurable per deployment.
+  - A verifier that checks a receipt **after the fact** (audit, dispute, archival re-verification, the vector corpus) **MUST NOT** reject it as stale for being older than a window around its own current time, because every receipt eventually is. It **MAY** check `issued_at` against an instant it has independent evidence for, such as when its log first recorded the receipt.
+
+  The receipt alone cannot tell a verifier which case applies. Implementations therefore take the reference instant as an explicit input. The reference implementation's `verify_receipt(r, now=..., max_skew_seconds=...)` applies the window only when `now` is supplied. Conformance vectors that exercise the window carry a `verifier_now` member giving that instant (vectors 26–28).
 - `issuer_did` and `principal_did` **MUST** be valid `did:key:` strings as defined in `spec/0.2/did-key.md`. Other DID methods are reserved for future versions.
 - `receipt_id` collisions are receipt-issuer-scoped, not global; two different issuers **MAY** independently use the same UUID without error.
 
@@ -81,7 +85,15 @@ The `action` member describes what was done.
 | `counterparty_label` | string | Human-readable name. Example: `"AMC Boston Common 19"`. |
 | `amount` | object | `{ "currency": "<ISO 4217 3-letter code>", "cents": <integer> }`. Negative `cents` indicates outgoing from the principal's perspective. |
 | `machine_payload` | object | Structured action-specific details. Schema is free-form by category; future minor versions of ARP **MAY** introduce per-category schemas. |
-| `reversal_of_receipt_id` | string | When `category` involves undoing a prior action, the UUID of the receipt being reversed. The issuer **MUST** be the same as the original receipt's issuer; the verifier **MUST** check this. |
+| `reversal_of_receipt_id` | string | When `category` involves undoing a prior action, the UUID of the receipt being reversed. The issuer **MUST** be the same as the original receipt's issuer; see the verifier rule below. |
+
+**Reversal issuer rule.** One agent cannot reverse another agent's receipt. A verifier that holds the original receipt, from its log or from an index it was given, **MUST** check this before accepting the reversal:
+
+1. The held original's `receipt_id` **MUST** equal `reversal_of_receipt_id`. A lookup that returns a different receipt is a failure.
+2. The original's `signature` **MUST** verify per §6.3 under its own `issuer_did`. A held copy whose signature fails proves nothing about who issued it.
+3. The original's `issuer_did` **MUST** equal the reversal's `issuer_did`.
+
+A verifier applying this rule **MUST** also reject a reversal whose `reversal_of_receipt_id` is its own `receipt_id` (a receipt cannot reverse itself) or is not a non-empty string. A verifier that does not hold the original cannot evaluate the rule. If it accepts such a reversal, that is its own policy decision, not the result of this check. The reference implementation applies the rule when it is given the originals it holds: `verify_receipt(r, originals={receipt_id: receipt, ...})`. Vector `29-reversal-issuer-mismatch` reverses vector 01 under a different issuer's key and is rejected by a verifier that holds vector 01.
 
 ### 4.3 Action category enumeration
 
@@ -215,8 +227,10 @@ A verifier **MUST**:
 3. Compute the canonical string `C` per §6.1.
 4. Decode the `signature` base64 to 64 bytes.
 5. Verify the Ed25519 signature over `C` using the resolved public key. **MUST** reject if verification fails.
-6. Check that `issued_at` is within the accept window (default ±300 s).
+6. Freshness (§3.3). When accepting the receipt as a live event, check that `issued_at` is within the accept window (default ±300 s, inclusive) of the verifier's current time, and reject it as stale or forward-dated otherwise. When verifying after the fact, do not apply a window around the current time; check against an independently evidenced instant if one is available.
 7. If `previous_receipt_hash` is present, fetch the prior receipt by its `receipt_id` (which **MUST** be discoverable in the issuer log) and verify that `sha256(<canonical bytes of prior receipt incl. its signature, excl. detached witness evidence>)` (§6.4) equals the declared hash. **MUST** reject if the hash does not match.
+
+If `action.reversal_of_receipt_id` is present and the verifier holds the original receipt, it **MUST** also apply the reversal issuer rule (§4.2).
 
 A verifier **SHOULD** additionally:
 
@@ -310,7 +324,7 @@ The Agency Log is the canonical reference for "what my agent did on my behalf." 
 
 ### 10.2 Issuer Log
 
-The **Issuer Log** is the agent's audit-side store. It **SHOULD** be hash-chained (see §6.4) for tamper-evidence. Chapters or platforms **MAY** operate an Issuer Log on behalf of their member agents. The Issuer Log is the canonical reference under audit, regulatory inquiry, or insurance dispute.
+The **Issuer Log** is the agent's audit-side store. It **SHOULD** be hash-chained (see §6.4) for tamper-evidence. Chapters or platforms **MAY** operate an Issuer Log on behalf of their member agents. The Issuer Log is the canonical reference under audit, regulatory inquiry, or insurance dispute. The reference implementation's `IssuerLog` refuses to store a receipt that would rewrite one it holds (same `issuer_did` and `receipt_id`, different signed content), fork the issuer's chain (a second successor to one predecessor), or fail to extend the issuer's current head. Its `AgencyLog`, which holds only part of each issuer's chain, refuses rewrites and forks.
 
 Receipts **MUST** be retrievable by `receipt_id` from at least one of these stores. Best practice: both, with periodic reconciliation (the divergence between them is itself audit-grade evidence).
 
@@ -324,7 +338,9 @@ Receipts contain potentially sensitive information. The protocol defines three v
 | Counterparty-visible (default) | `receipt_id`, `issuer_did`, `issued_at`, `action.category`, `action.outcome`, `action.amount`, `signature` | the counterparty named in `action.counterparty_did` |
 | Public (opt-in) | none by default | nobody, unless principal explicitly publishes |
 
-The principal **MAY** publish receipts (e.g., for proof-of-work portfolios, public attestations, transparency reports). The runtime publishing tool **MUST** support a "redacted publish" mode that strips `human_summary`, `machine_payload`, `evidence`, and `accessibility.alt_summaries` while preserving the signature over the original canonical string. (This is achievable because JCS canonicalization is deterministic — the signature continues to verify against the original, redacted receipts include both the redacted body and the unmodified signature.)
+The signature covers the whole receipt. It is computed over the canonical string `C` of every member except `signature` and the detached `evidence.witness_signatures` (§6.1). A view that shows only some members, such as the counterparty-visible tier above, is therefore an **excerpt**. The excerpt does not verify on its own: §6.3 step 5 recomputes `C` from the members present, so any removed member makes the signature fail. A holder can check an excerpt only by obtaining the full receipt, verifying it, and comparing the shown members against it.
+
+The principal **MAY** publish receipts (e.g., for proof-of-work portfolios, public attestations, transparency reports), either whole or as a redacted excerpt that omits members such as `human_summary`, `machine_payload`, `evidence`, or `accessibility.alt_summaries`. A whole receipt stays verifiable. A redacted excerpt does not: in v0.1 it is an unsigned statement by the publisher, even if it reproduces the original `signature` value. Publishing tools **MUST NOT** present a redacted excerpt as signature-verifiable. v0.1 defines no selective-disclosure scheme that would let a signature cover a partial receipt (see §18).
 
 ## 11. Security considerations
 
@@ -334,7 +350,7 @@ Receipts are signed by the issuer, not the principal. A compromised issuer key c
 
 ### 11.2 Replay
 
-`receipt_id` uniqueness, `issued_at` window enforcement (default ±300 s), and (when present) the `previous_receipt_hash` chain together prevent replay as a duplicate event. Verifiers **MUST** maintain a bounded `(issuer_did, receipt_id)` set with TTL ≥ 600 s and reject duplicates.
+`receipt_id` uniqueness, the `issued_at` window applied when a receipt is accepted as a live event (§3.3, default ±300 s), and (when present) the `previous_receipt_hash` chain together prevent replay as a duplicate event. Verifiers **MUST** maintain a bounded `(issuer_did, receipt_id)` set with TTL ≥ 600 s and reject duplicates. The window does not apply to after-the-fact verification (§3.3), so replay protection for archived receipts rests on the seen-set, the hash chain, and the log, not on the timestamp.
 
 ### 11.3 Hash-chain tampering
 
@@ -434,7 +450,8 @@ A purchase action by a member agent on behalf of a human principal:
 
 - core categories (`purchase`, `message_sent`, `decision_made`, `data_shared`, `record_filed`, `attestation_issued`, `vote_cast`)
 - positive: signature verifies; schema passes; hash chain links
-- negative: forged signature, tampered body, wrong hash chain, oversized `human_summary`, invalid `principal_did`, missing required field, mismatched `reversal_of_receipt_id` issuer
+- negative: forged signature, tampered body, wrong hash chain, oversized `human_summary`, invalid `principal_did`, missing required field, mismatched `reversal_of_receipt_id` issuer (`29`, run with the positive corpus as the originals the verifier holds)
+- freshness (§3.3): stale and forward-dated `issued_at` (`26`, `27`) and the inclusive window edge (`28`), each carrying a `verifier_now` reference instant; vectors without `verifier_now` are verified after the fact, with no window
 - forward-compat: unknown extension key (tolerant verifier accepts), unknown category (strict rejects, tolerant accepts as `other`)
 - accessibility: receipts with `alt_summaries` for multiple languages, `requires_review=true`
 - jurisdiction: GDPR-tagged data_shared, multi-jurisdiction data_residency
@@ -449,17 +466,33 @@ The suite is intentionally framework-agnostic — it loads vectors and verifies 
 
 ## 16. Relationship to the Attested Action Envelope (AAE)
 
-ARP and the Attested Action Envelope (AAE) are **complementary** per-action evidence primitives, not competitors. They address different audiences and carry different properties:
+*This section is non-normative.*
 
-- An **ARP receipt** is the *human-facing* record: a one-sentence `human_summary`, an `authority_chain` binding the action to a delegated grant, held by the represented human, a regulator, or an insurer. Its tamper-evidence is the per-issuer forward hash chain (§6.4).
-- An **AAE envelope** is the *substrate* evidence record: the `action` / `decision` / `belief` / `checkpoint` kinds, rendered by operator surfaces, with `checkpoint` envelopes anchoring **bidirectional** (forward + reverse merkle-inclusion) audit over the envelopes in scope.
+The Attested Action Envelope (AAE), as specified and implemented by [`sm-aae`](https://github.com/Sharathvc23/sm-aae) (AAE SPEC v0.1, working draft), records a **pre-action authorization verdict**. Before an agent acts, a policy decides, and the issuer signs a JSON object with exactly eight members:
 
-The two compose through a defined seam:
+| Member | Meaning |
+|---|---|
+| `agent_id` | the acting agent's identity, a free-form string |
+| `action` | `{verb, resource, params}`, what the agent asked to do |
+| `policy_id` | the policy entry that produced the verdict |
+| `outcome` | `authorized`, `denied` or `conditional`; refusals are signed too |
+| `prev_hash` | hex SHA-256 of the agent's previous signed envelope, or `null` for its first |
+| `issued_at` | RFC 3339 timestamp |
+| `sig` | hex Ed25519 signature over the sorted-key, compact JSON of the other seven members |
+| `pubkey` | hex of the raw 32-byte Ed25519 public key |
 
-1. An ARP receipt's `evidence` **MAY** reference the AAE envelope(s) that substantiate the action — by the envelope's content hash — so a verifier can cross-walk from the human's receipt to the substrate evidence.
-2. An AAE `checkpoint` **MAY** include ARP receipts among the records it commits to, so the bidirectional audit AAE provides extends to ARP receipts without ARP defining its own merkle layer.
+An ARP receipt and an AAE envelope therefore record different moments. The envelope records what an agent was permitted or refused, before it acted. The receipt records what it did, for whom, and with what outcome, afterwards. They are independent formats:
 
-ARP therefore **MUST NOT** define a bidirectional (checkpoint/merkle) audit mechanism of its own — when reverse-audit anchoring is required, an implementation relies on AAE via the seam above. Conversely, AAE carries no `human_summary` or `authority_chain`; those remain ARP's. An implementation **MAY** emit both for a single action — an ARP receipt for the human, an AAE envelope for the substrate — linked by the evidence reference. Neither primitive is redundant: each owns what the other deliberately omits.
+| | ARP receipt | AAE envelope (sm-aae) |
+|---|---|---|
+| When issued | after the action | before the action |
+| Signer identity | `issuer_did` (`did:key`), plus `principal_did` | `agent_id` (any string) + `pubkey` (raw hex key); no principal |
+| Canonical form / signature | RFC 8785 JCS; base64 Ed25519 | sorted-key compact JSON; hex Ed25519 |
+| Per-signer chain | `previous_receipt_hash` = `sha256:<hex>` over §6.4 bytes | `prev_hash` = 64-hex SHA-256 of the full signed envelope |
+
+**What holds today.** Neither format references the other. No ARP member carries an AAE envelope or its hash, and nothing in sm-aae carries an ARP receipt. sm-aae has no envelope kinds beyond the single verdict shape, no checkpoint envelope, and no Merkle commitment. Nothing ties an envelope's `agent_id`/`pubkey` to a receipt's `issuer_did`. An issuer that keeps both records may note an envelope's hash among the receipt's free-form `evidence.external_refs` (§5). ARP verifiers do not dereference or check that string.
+
+**Future work (not specified, not implemented).** A defined binding between the two is open (§18). Candidates include a typed `evidence` member that names an AAE envelope by hash, a rule tying an envelope's signing key to the receipt's `issuer_did`, and a checkpoint or Merkle commitment covering receipts and envelopes together. Until one is specified, ARP's own tamper-evidence is the per-issuer hash chain (§6.4), plus the checkpoint recommendation in §11.3.
 
 ## 17. Governance and stewardship
 
@@ -473,6 +506,8 @@ See [`governance.md`](./governance.md) for the change process, the contributor a
 - **Multi-principal actions.** What if an agent acts on behalf of two humans (couple booking joint flight)? v0.1 mandates a single `principal_did`; v0.2 may extend.
 - **MCP tool-invocation correlation.** `evidence.tool_invocations` is sketched; v0.2 should define a canonical join key between an MCP server's audit log and an ARP receipt.
 - **EU AI Act mapping.** The Act's Article 13 transparency provisions land 2027; v0.2 **SHOULD** include a normative mapping appendix showing how a complete ARP receipt satisfies each Article 13 sub-clause.
+- **Selective disclosure.** v0.1 signatures cover the whole receipt, so a redacted excerpt does not verify (§10.3). A scheme that lets a holder disclose some members and keep a verifiable signature is not defined.
+- **ARP ↔ AAE binding.** Whether and how a receipt names the AAE verdict that authorized its action, how the two signer identities are tied, and whether a shared checkpoint covers both (§16).
 
 ---
 

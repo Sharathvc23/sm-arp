@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import json
+from datetime import datetime
 from pathlib import Path
 
 import typer
@@ -47,6 +48,8 @@ def _verify_one(
     receipt: dict,
     mode: str,
     priors: dict[str, dict] | None = None,
+    originals: dict[str, dict] | None = None,
+    now: datetime | None = None,
 ) -> tuple[bool, str, str]:
     """Run verify_receipt and return (ok, stage, detail).
 
@@ -55,8 +58,12 @@ def _verify_one(
     to actually resolve. None means "no prior context" (chain step will fail
     for any receipt that declares a hash-chain link, which is the right
     behaviour for verifying a single isolated receipt).
+
+    `originals` (receipt_id → receipt) are the receipts held for the spec §4.2
+    reversal-issuer check; `now` is a reference instant for the §3.3 freshness
+    window. Both default to "not supplied", which skips those stages.
     """
-    result = verify_receipt(receipt, mode=mode, prior_receipts=priors)
+    result = verify_receipt(receipt, mode=mode, prior_receipts=priors, originals=originals, now=now)
     return result.ok, result.stage, result.detail
 
 
@@ -70,9 +77,11 @@ def verify(
 ) -> None:
     """Verify a single receipt or a trace (array of receipts).
 
-    Runs schema validation, Ed25519 signature check, and (if present) the
-    previous_receipt_hash chain check. Auto-detects single vs. trace by
-    inspecting the JSON root.
+    Runs schema validation, Ed25519 signature check, (if present) the
+    previous_receipt_hash chain check, and, for a reversal whose original is in
+    the same file, the spec §4.2 issuer check. Auto-detects single vs. trace by
+    inspecting the JSON root. No freshness window is applied: this verifies
+    receipts after the fact (spec §3.3).
     """
     if mode not in VERIFIER_MODES:
         typer.secho(
@@ -95,10 +104,16 @@ def verify(
         for r in receipts
     ]
     priors = {compute_chain_link(a): a for a in actuals}
+    # The receipts in the file are the originals this verifier holds (spec §4.2).
+    originals = {
+        a["receipt_id"]: a
+        for a in actuals
+        if isinstance(a, dict) and isinstance(a.get("receipt_id"), str)
+    }
 
     failures = 0
     for idx, actual in enumerate(actuals, start=1):
-        ok_flag, stage, detail = _verify_one(actual, mode, priors=priors)
+        ok_flag, stage, detail = _verify_one(actual, mode, priors=priors, originals=originals)
         rid = actual.get("receipt_id", "<no-id>")
         if ok_flag:
             narrate.ok(f"Receipt {idx} [{rid}] → accepted")
@@ -441,7 +456,16 @@ def vectors_run(
     narrate.kv("spec_ref", body.get("spec_ref", "—"))
     typer.echo()
 
-    ok_flag, stage, detail = _verify_one(receipt, mode, priors=corpus.chain_priors())
+    verifier_now = body.get("verifier_now")
+    if verifier_now:
+        narrate.kv("verifier_now", verifier_now)
+    ok_flag, stage, detail = _verify_one(
+        receipt,
+        mode,
+        priors=corpus.chain_priors(),
+        originals=corpus.originals(),
+        now=datetime.fromisoformat(verifier_now) if verifier_now else None,
+    )
     if expected == "verify_pass":
         if ok_flag:
             narrate.ok(f"verified — stage={stage}")
@@ -453,6 +477,8 @@ def vectors_run(
         expected_stage_map = {
             "schema_fail": "schema",
             "signature_fail": "signature",
+            "freshness_fail": "freshness",
+            "reversal_fail": "reversal",
             "hash_chain_fail": "hash_chain",
         }
         want_stage = expected_stage_map.get(expected, "?")
