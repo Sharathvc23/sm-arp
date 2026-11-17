@@ -30,13 +30,19 @@ r = issue_receipt(
     action=build_action(category="data_shared", human_summary="shared my calendar"),
 )
 assert verify_receipt(r).ok  # structure (§3) → issuer signature (§6.3); nothing else by default
-IssuerLog("log.sqlite").append(r)  # SQLite Issuer/Agency Log, hash-chained per issuer
+IssuerLog("log.sqlite").append(r)  # SQLite Issuer Log; refuses rewrites, forks and gaps
 ```
 
-`verify_receipt(r)` on its own checks **structure and signature only**. The other two
+`verify_receipt(r)` on its own checks **structure and signature only**. The other
 stages are opt-in, because each needs context the receipt does not carry:
 
 ```python
+from datetime import UTC, datetime
+
+verify_receipt(r, now=datetime.now(UTC))         # + freshness (§3.3): issued_at within ±300 s
+                                                 #   of now (max_skew_seconds= to change it)
+verify_receipt(r, originals=held)                # + reversal issuer (§4.2): held = {receipt_id:
+                                                 #   receipt} of the receipts you hold
 grants = {grant["receipt_id"]: grant}            # the authority_granted receipts you trust
 verify_receipt(r, grants=grants)                 # + authority chain (§4.5): the grant's own
                                                  #   signature, grantee, scope and expiry
@@ -44,16 +50,28 @@ verify_receipt(r2, prior=r1, check_chain=True)   # + hash chain (§6.4); prior=N
 verify_receipt(r, mode="tolerant")               # accept unknown categories / top-level members
 ```
 
+Pass `now` when you accept a receipt as a live event. Leave it out when you re-verify an
+old receipt for audit: every receipt eventually falls outside a window around the
+current time, so the spec applies the window only at live acceptance. You can also pass
+an instant you have independent evidence for, such as when your log first recorded the
+receipt.
 `mode` is `"strict"` (default) or `"tolerant"`; anything else raises `ValueError`.
+
+The receipt logs are append-only. `IssuerLog` (an issuer's own log) refuses a receipt
+that rewrites one it holds, forks the chain, or does not extend the issuer's current
+head. `AgencyLog` (a principal's log, which holds partial chains) refuses rewrites and
+forks. Re-appending an identical receipt is a no-op, and a copy that only adds witness
+co-signatures updates the stored one. Refusals raise `AppendRefused` (a `ValueError`)
+with a `.reason`. `append` does not verify signatures, so verify before you append.
 `verify_direct_grant(action, grant, at=...)` is the stricter, fully authenticated
 single-grant check (see below). Witness co-signatures in `evidence.witness_signatures`
 are **detached evidence** (spec §5.1): appending one after issuance leaves the issuer
 signature and the chain link intact — `sm_arp.vrp.cosign_receipt` / `is_corroborated`
 read and write them.
 
-`sm_arp`'s verifier is tested against the canonical 25-vector corpus and asserted
-byte-for-byte equal to the conformance harness's verdict on every vector — so the
-library and the spec cannot disagree.
+`sm_arp`'s verifier is tested against the canonical 29-vector corpus and asserted to
+reach the conformance harness's verdict on every vector, so the library and the harness
+cannot disagree on any vector.
 
 ## Layout
 
@@ -65,7 +83,7 @@ library and the spec cannot disagree.
 - `spec/arp/0.1/governance.md` — stewardship and the path to public publication.
 - `spec/arp/0.1/dat-companion.md` — the Delegated Authority Token sketch the authority chain references.
 - `schema/arp/0.1/` — JSON Schemas (Draft 2020-12) for the receipt envelope.
-- `vectors/arp/0.1/` — 25 language-agnostic receipt vectors.
+- `vectors/arp/0.1/` — 29 language-agnostic receipt vectors.
 - `conformance/arp/` — framework-agnostic Python conformance harness for receipts.
 
 ## The conformance badge lives in sm-conformance

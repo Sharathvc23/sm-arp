@@ -1,5 +1,52 @@
 # Changelog — sm-arp
 
+## Unreleased — verifier MUSTs: freshness, reversal issuer, append-only logs
+
+Public API changes are additive except the log behaviour below. No receipt bytes,
+signature or chain link changes; the 25 existing vectors are byte-identical.
+
+- **`verify_receipt(..., now=, max_skew_seconds=)`: `issued_at` freshness** (spec §3.3,
+  §6.3 step 6). When `now` (an aware `datetime`) is given, `issued_at` must be within
+  `max_skew_seconds` (default 300, inclusive) of it; stale and forward-dated
+  receipts fail at the new `freshness` stage. Without `now`, nothing changes and old
+  receipts still verify for audit. A naive `now`, a negative or non-int window, or a
+  window without `now` raise `ValueError`. New `verify_freshness`,
+  `DEFAULT_MAX_SKEW_SECONDS`.
+- **`verify_receipt(..., originals=)`: reversal issuer** (spec §4.2). With an index of
+  held receipts keyed by `receipt_id`, a reversal whose original is held must come
+  from the original's issuer. The original's key must match its `receipt_id` and its
+  signature must verify. A self-reversal or non-string reference fails. Failures use
+  the new `reversal` stage. A reversal whose original is not held is not evaluated.
+  New `verify_reversal`.
+- **Receipt logs no longer rewrite or fork.** `ReceiptLog.append` used
+  `INSERT OR REPLACE`, so re-appending a different receipt under an existing
+  `(issuer_did, receipt_id)` silently replaced it, and nothing checked
+  `previous_receipt_hash`. Now, in one write transaction:
+  - every log (`ReceiptLog`, `AgencyLog`, `IssuerLog`) refuses a rewrite (same id,
+    different signed content), refuses a re-append that would drop witness
+    co-signatures, and refuses a fork (a second receipt by one issuer claiming the
+    same predecessor). Re-appending an identical receipt is still a no-op. A copy
+    with extra witnesses (detached evidence, §5.1) updates the stored copy.
+  - `IssuerLog` is now a subclass of `ReceiptLog` that also requires each receipt to
+    extend the issuer's current head: no gaps, no link into another issuer's chain,
+    no branch off an older receipt, no second genesis once the issuer chains.
+    `AgencyLog` stays `ReceiptLog`, because a principal's log holds partial,
+    possibly out-of-order chains.
+  - malformed key fields (non-string ids, a `previous_receipt_hash` that is present
+    but not `sha256:<64 hex>`) are refused instead of raising `KeyError` or a SQLite
+    binding error.
+  - refusals raise the new `AppendRefused(ValueError)`, with `.reason` set to
+    `malformed`, `rewrite`, `fork` or `discontinuity`.
+  **Behaviour change:** code that relied on `append` overwriting a stored receipt,
+  or on storing a forked chain, now gets `AppendRefused`.
+- **Conformance harness** gains the same `now` / `max_skew_seconds` / `originals`
+  inputs and the `freshness` / `reversal` stages. Vectors 26–29 added (25 → 29). The
+  CLI's `vectors run` honours `verifier_now`, and `arp verify` checks the reversal
+  rule against originals in the same file.
+- **Spec text corrected** (spec changelog "Unreleased"): §10.3 no longer claims a
+  redacted receipt keeps a verifiable signature, and §16 describes the Attested
+  Action Envelope as sm-aae implements it.
+
 ## 0.4.0 — detached witness evidence, authenticated authority chain, strict structure (audit 2026-11)
 
 Fixes every finding of the 2026-11 audit of sm-arp and its consumers (sm-oversight,
